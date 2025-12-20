@@ -1,15 +1,15 @@
 class Web{};
 (()=>{
 
-const Web = Web;
 
 const setProperty = (object,property)=>{
   const [key,value] = Object.entries(property).pop()
-  return Object.definePropery(object,key,{
+  return Object.defineProperty(object,key,{
     value,
     enumerable:true,
     configurable:false,
-    writeable:false
+    writeable:false,
+    writable:false
   });
 };
 
