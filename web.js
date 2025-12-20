@@ -38,7 +38,7 @@ function toBits(x){
       return Object.setPrototypeOf(new Uint8Array(x.buffer ?? x),Array.prototype);
     }
     if(hasBits(x)){
-      return getBits(x);
+      return Object.setPrototypeOf(getBits(x),Array.prototype);
     }
     if(isBits(x)){
       return x;
