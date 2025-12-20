@@ -13,8 +13,20 @@ const setProperty = (object,property)=>{
   });
 };
 
-const len = x => x?.length || x?.size || x?.byteLength;
+const instanceOf = (x,y) =>{
+  try{
+    return x instanceof y;
+  }catch(_){
+    return false;
+  }
+};
 
+const len = x => x?.length || x?.size || x?.byteLength;
+const isNum x => x > -1;
+const isBits = x => x?.every?.(isNum);
+const hasBuffer = x => !!x?.buffer;
+const isBuffer = x => instanceOf(x,ArrayBuffer) || x?.constructor?.name == 'ArrayBuffer';
+  
 const Blob = class WebBlob extends Utilities.newBlob{
 
   constructor(parts=[],type,name){
