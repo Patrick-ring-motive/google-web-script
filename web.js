@@ -13,14 +13,14 @@ const setProperty = (object,property)=>{
   });
 };
 
-
+const len = x => x?.length || x?.size || x?.byteLength;
 
 const Blob = class WebBlob extends Utilities.newBlob{
 
   constructor(parts=[],type,name){
     type = type?.type ?? type;
-    if(!parts.length){
-      return super(parts,type);
+    if(!len(parts)){
+      return super(parts,type,name);
     }
   }
   
