@@ -22,7 +22,7 @@ const instanceOf = (x,y) =>{
 
 const len = x => x?.length || x?.size || x?.byteLength;
 const isNum = x => x > -1;
-const hasBits = x => !!(x?.bytes || x?.getBytes;
+const hasBits = x => !!(x?.bytes || x?.getBytes);
 const getBits = x => x.getBytes?.() ?? x.bytes();
 const isBits = x => Array.prototype.every.call(x,isNum);
 const hasBuffer = x => !!x?.buffer;
