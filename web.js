@@ -22,7 +22,7 @@ const instanceOf = (x,y) =>{
 };
 
 const len = x => x?.length || x?.size || x?.byteLength;
-const isNum x => x > -1;
+const isNum = x => x > -1;
 const isBits = x => x?.every?.(isNum);
 const hasBuffer = x => !!x?.buffer;
 const isBuffer = x => instanceOf(x,ArrayBuffer) || x?.constructor?.name == 'ArrayBuffer';
@@ -36,6 +36,10 @@ const Blob = class WebBlob extends Utilities.newBlob{
     if(!len(parts)){
       return super(parts,type,name);
     }
+    if(isString(parts)){
+      return super(parts,type,name);
+    }
+    if(
   }
   
   get size(){
