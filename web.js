@@ -23,16 +23,33 @@ const instanceOf = (x,y) =>{
 
 const len = x => x?.length || x?.size || x?.byteLength;
 const isNum = x => x > -1;
+const hasBits = x => !!(x?.bytes || x?.getBytes;
+const getBits = x => x.getBytes?.() ?? x.bytes();
 const isBits = x => x?.every?.(isNum);
 const hasBuffer = x => !!x?.buffer;
 const isBuffer = x => instanceOf(x,ArrayBuffer) || x?.constructor?.name == 'ArrayBuffer';
 const isArray = x => Array.isArray(x) || instanceOf(x,Array) || x?.constructor?.name == 'Array';
 const isString = x = typeof x === 'string' || instanceOf(x,String) || x?.constructor?.name == 'String';
+
+const toBits = x =>{
+    if(isString(x)){
+      return new Uint8Array(Utilities.newBlob(x).getBytes());
+    }
+    if(isBuffer(x) || hasBuffer(x)){
+      return new Uint8Array(x.buffer ?? x);
+    }
+    if(hasBits(x)){
+      return new Uint8Array(getBits(x));
+    }
+    if(isBits(x)){
+      return new Uint8Array(x);
+    }
+};
   
 const Blob = class WebBlob extends Utilities.newBlob{
 
   constructor(parts=[],type,name){
-    type = type?.type ?? type;
+    type = type?.type ?? type ?? parts?.type ?? parts?.getContentType?.();
     if(!len(parts)){
       return super(parts,type,name);
     }
