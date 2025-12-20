@@ -39,7 +39,9 @@ const Blob = class WebBlob extends Utilities.newBlob{
     if(isString(parts)){
       return super(parts,type,name);
     }
-    if(
+    if(isBuffer(parts) || hasBuffer(parts)){
+      return super(new Uint8Array(parts.buffer ?? parts),type,name);
+    }
   }
   
   get size(){
