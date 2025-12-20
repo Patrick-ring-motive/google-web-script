@@ -28,14 +28,14 @@ const isBits = x => Array.prototype.every.call(x,isNum);
 const hasBuffer = x => !!x?.buffer;
 const isBuffer = x => instanceOf(x,ArrayBuffer) || x?.constructor?.name == 'ArrayBuffer';
 const isArray = x => Array.isArray(x) || instanceOf(x,Array) || x?.constructor?.name == 'Array';
-const isString = x = typeof x === 'string' || instanceOf(x,String) || x?.constructor?.name == 'String';
+const isString = x => typeof x === 'string' || instanceOf(x,String) || x?.constructor?.name == 'String';
 
 function toBits(x){
     if(isString(x)){
       return Utilities.newBlob(x).getBytes();
     }
     if(isBuffer(x) || hasBuffer(x)){
-      return [...new Uint8Array(x.buffer ?? x)];
+      return Object.setPrototypeOf(new Uint8Array(x.buffer ?? x),Array.prototype);
     }
     if(hasBits(x)){
       return getBits(x);
