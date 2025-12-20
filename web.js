@@ -1,7 +1,6 @@
 class Web{};
 (()=>{
 
-
 const setProperty = (object,property)=>{
   const [key,value] = Object.entries(property).pop()
   return Object.defineProperty(object,key,{
@@ -25,25 +24,29 @@ const len = x => x?.length || x?.size || x?.byteLength;
 const isNum = x => x > -1;
 const hasBits = x => !!(x?.bytes || x?.getBytes;
 const getBits = x => x.getBytes?.() ?? x.bytes();
-const isBits = x => x?.every?.(isNum);
+const isBits = x => Array.prototype.every.call(x,isNum);
 const hasBuffer = x => !!x?.buffer;
 const isBuffer = x => instanceOf(x,ArrayBuffer) || x?.constructor?.name == 'ArrayBuffer';
 const isArray = x => Array.isArray(x) || instanceOf(x,Array) || x?.constructor?.name == 'Array';
 const isString = x = typeof x === 'string' || instanceOf(x,String) || x?.constructor?.name == 'String';
 
-const toBits = x =>{
+function toBits(x){
     if(isString(x)){
-      return new Uint8Array(Utilities.newBlob(x).getBytes());
+      return Utilities.newBlob(x).getBytes();
     }
     if(isBuffer(x) || hasBuffer(x)){
-      return new Uint8Array(x.buffer ?? x);
+      return [...new Uint8Array(x.buffer ?? x)];
     }
     if(hasBits(x)){
-      return new Uint8Array(getBits(x));
+      return getBits(x);
     }
     if(isBits(x)){
-      return new Uint8Array(x);
+      return x;
     }
+    if(isArray(x)){
+      return x.map(toBits).flat();
+    }
+    return x;
 };
   
 const Blob = class WebBlob extends Utilities.newBlob{
@@ -56,9 +59,7 @@ const Blob = class WebBlob extends Utilities.newBlob{
     if(isString(parts)){
       return super(parts,type,name);
     }
-    if(isBuffer(parts) || hasBuffer(parts)){
-      return super(new Uint8Array(parts.buffer ?? parts),type,name);
-    }
+    return super(toBits(parts),type,name);
   }
   
   get size(){
