@@ -26,6 +26,8 @@ const isNum x => x > -1;
 const isBits = x => x?.every?.(isNum);
 const hasBuffer = x => !!x?.buffer;
 const isBuffer = x => instanceOf(x,ArrayBuffer) || x?.constructor?.name == 'ArrayBuffer';
+const isArray = x => Array.isArray(x) || instanceOf(x,Array) || x?.constructor?.name == 'Array';
+const isString = x = typeof x === 'string' || instanceOf(x,String) || x?.constructor?.name == 'String';
   
 const Blob = class WebBlob extends Utilities.newBlob{
 
