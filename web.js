@@ -14,8 +14,16 @@ const setProperty = (object,property)=>{
 };
 
 
+
 const Blob = class WebBlob extends Utilities.newBlob{
 
+  constructor(parts=[],type,name){
+    type = type?.type ?? type;
+    if(!parts.length){
+      return super(parts,type);
+    }
+  }
+  
   get size(){
     return this.getBytes().length;
   }
