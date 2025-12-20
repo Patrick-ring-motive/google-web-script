@@ -90,4 +90,38 @@ const Blob = class WebBlob extends Utilities.newBlob{
 
 setProperty(Web,{Blob});
 
+const $body = Symbol('*body');
+  
+const Response = class WebResponse {
+  constructor(body, options = {}) {
+    Object.assign(this,{body,headers:{},status:200,...options});
+    this[$ = Utilities.newBlob([...this.body??[]].map(x=>x.charCodeAt()));
+  }
+  getAllHeaders() {
+    return this.headers;
+  }
+  getHeaders() {
+    return this.headers;
+  }
+  getContent() {
+    return this.bodyBlob?.getBytes?.();
+  }
+  getAs(type){
+    return this.bodyBlob?.getAs?.(type);
+  }
+  getBlob(type){
+    return this.bodyBlob;
+  }
+  getContentText(charset) {
+    return charset ? this.bodyBlob.getDataAsString(charset) : this.body;
+  }
+  toString(){
+    return this.body;
+  }
+  getResponseCode() {
+    return this.status;
+  }
+};
+
+
 })();
