@@ -140,7 +140,7 @@ const Headers = class WebHeaders{
     const cookies = [];
     for(const key in this){
       if(String(key).toLowerCase() === 'set-cookie'){
-        return cookies.push(this[k]);
+        cookies.push(this[key]);
       }
     }
     return cookies;
@@ -152,7 +152,7 @@ const Headers = class WebHeaders{
       const cookies = [];
       for(const key in this){
         if(String(key).toLowerCase() === head){
-          return cookies.push(this[k]);
+          cookies.push(this[key]);
         }
       }
       return cookies;
@@ -191,7 +191,7 @@ const Headers = class WebHeaders{
     return Object.entries(this).values();
   }
 
-  [Symbol.iterator]{
+  [Symbol.iterator](){
     return this.entries();
   }
 
