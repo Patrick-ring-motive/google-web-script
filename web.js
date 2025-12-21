@@ -218,7 +218,7 @@ const $headers = Symbol('*headers');
 const Response = class WebResponse {
   constructor(body, options = {}) {
     Object.assign(this,options);
-    this[$headers]; = new Web.Headers(this.headers);
+    this[$headers] = new Web.Headers(this.headers);
     if(body){
       this[$body] = new Web.Blob(body);
     }
@@ -267,5 +267,20 @@ const Response = class WebResponse {
   }
 };
 
+  setProperty(Web,{Response});
+
+  const Request = class WebRequest {
+  constructor(url, options = {}) {
+    this.url = url;
+    Object.assign(this,options);
+    this.headers = new Web.Headers(options.headers);
+    if(options.body){
+      this[$body] = new Web.Blob(options.body);
+    }
+  }
+  
+};
+
+  setProperty(Web,{Request});
 
 })();
