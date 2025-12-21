@@ -212,37 +212,55 @@ const Headers = class WebHeaders{
 setProperty(Web,{Headers});
 
 const $body = Symbol('*body');
+const $status = Symbol('*status');
+const $headers = Symbol('*headers');
   
 const Response = class WebResponse {
   constructor(body, options = {}) {
-    Object.assign(this,{body,headers:{},status:200,...options});
+    Object.assign(this,options);
+    this[$headers]; = new Web.Headers(this.headers);
     if(body){
       this[$body] = new Web.Blob(body);
     }
   }
   getAllHeaders() {
-    return this.headers;
+    return this[$headers];
   }
   getHeaders() {
-    return this.headers;
+    return this[$headers];
+  }
+  get headers(){
+    return this.getHeaders();
   }
   getContent() {
-    return this.bodyBlob?.getBytes?.();
+    return this[$body]?.getBytes?.();
+  }
+  bytes(){
+    return new Uint8Array(this.getContent());
   }
   getAs(type){
-    return this.bodyBlob?.getAs?.(type);
+    return this[$body]?.getAs?.(type);
   }
   getBlob(type){
-    return this.bodyBlob;
+    return this[$body];
+  }
+  blob(){
+    return this.getBlob();
   }
   getContentText(charset) {
-    return charset ? this.bodyBlob.getDataAsString(charset) : this.body;
+    return charset ? this[$body]?.getDataAsString?.(charset) : this[$body].text();
   }
-  toString(){
-    return this.body;
+  text(){
+    return this.getContentText();
   }
-  getResponseCode() {
-    return this.status;
+  getResponseCode(){
+    return this[$status];
+  }
+  get status(){
+    return this.getResponseCode();
+  }
+  get ok(){
+    return this.status >= 200 && this.status < 300;
   }
 };
 
