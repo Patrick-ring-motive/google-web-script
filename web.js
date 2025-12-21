@@ -1,6 +1,6 @@
-class Web{};
-(()=>{
 
+(()=>{
+globalThis.Web = class Web{};
 const setProperty = (object,property)=>{
   const [key,value] = Object.entries(property).pop()
   return Object.defineProperty(object,key,{
@@ -248,7 +248,7 @@ const Response = class WebResponse {
     return this.getBlob();
   }
   getContentText(charset) {
-    return charset ? this[$body]?.getDataAsString?.(charset) : this[$body].text();
+    return charset ? this[$body]?.getDataAsString?.(charset) : this[$body]?.getDataAsString?.();
   }
   text(){
     return this.getContentText();
