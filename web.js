@@ -95,7 +95,9 @@ const $body = Symbol('*body');
 const Response = class WebResponse {
   constructor(body, options = {}) {
     Object.assign(this,{body,headers:{},status:200,...options});
-    this[$ = Utilities.newBlob([...this.body??[]].map(x=>x.charCodeAt()));
+    if(body){
+      this[$body] = new Web.Blob(body);
+    }
   }
   getAllHeaders() {
     return this.headers;
