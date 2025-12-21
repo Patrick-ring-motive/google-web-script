@@ -269,8 +269,9 @@ const Response = class WebResponse {
 
   setProperty(Web,{Response});
 
-  const Request = class WebRequest {
+  const Request = class WebRequest extends UrlFetchApp.getRequest{
   constructor(url, options = {}) {
+    super(...arguments);
     this.url = url;
     Object.assign(this,options);
     this.headers = new Web.Headers(options.headers);
