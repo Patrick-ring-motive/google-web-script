@@ -253,6 +253,9 @@ const Response = class WebResponse {
   text(){
     return this.getContentText();
   }
+  json(){
+    return JSON.parse(this.getContentText());
+  }
   getResponseCode(){
     return this[$status];
   }
