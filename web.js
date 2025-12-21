@@ -136,6 +136,43 @@ const Headers = class WebHeaders{
     }
   }
 
+  getSetCookie(){
+    const cookies = [];
+    for(const key in this){
+      if(String(key).toLowerCase() === 'set-cookie'){
+        return cookies.push(this[k]);
+      }
+    }
+    return cookies;
+  }
+
+  getAll(head){
+    head = String(head).toLowerCase();
+    if(/^(set-)?cookie$/.test(key)){
+      const cookies = [];
+      for(const key in this){
+        if(String(key).toLowerCase() === head){
+          return cookies.push(this[k]);
+        }
+      }
+      return cookies;
+    }
+    const value = this.get(head);
+    if(value == undefined)return [];
+    return String(value).split(',').map(x=>x.trim());
+  }
+
+  has(key){
+    if(this[key] != undefined)true;
+    key = String(key).toLowerCase();
+    for(const k in this){
+      if(String(k).toLowerCase() === key && this[k] != undefined){
+        return true;
+      }
+    }
+    return false;
+  }
+
   append(key,value){
     key = String(key).toLowerCase();
     if(/^(set-)?cookie$/.test(key)){
