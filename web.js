@@ -90,6 +90,76 @@ const Blob = class WebBlob extends Utilities.newBlob{
 
 setProperty(Web,{Blob});
 
+const Headers = class WebHeaders{
+  
+  constructor(entries){
+    if(!entries)return this;
+    try{
+      for(const [key,value] of entries){
+        this.append(key,value);
+      }
+      return this;
+    }catch(_){
+      for(const key in entries){
+        this.append(key,entries[key]);
+      }
+      return this;
+    }
+  }
+  
+  delete(key){
+    if(!key)return;
+    key = String(key).toLowerCase();
+    for(const k in this){
+      if(String(k).toLowerCase() === key){
+        delete this[k];
+      }
+    }
+  }
+  
+  set(key,value){
+    this.delete(key);
+    this[String(key).toLowerCase()] = value;
+  }
+
+  get(key){
+    if(this[key])return this[key];
+    key = String(key).toLowerCase();
+    for(const k in this){
+      if(String(k).toLowerCase() === key){
+        return this[k];
+      }
+    }
+  }
+
+  append(key,value){
+    key = String(key).toLowerCase();
+    if(/^(set-)?cookie$/.test(key)){
+      while(this[key] != undefined)key = key.replace(/./g,x=>x[`to${Math.random()>.5?'Upp':'Low'}erCase`]());
+      this[key] = value;
+    }else{
+      if(this[key] == undefined){
+        this[key] = value;
+      }else{
+        this[key] = `${this[key]}, ${value}`;
+      }
+    }
+  }
+
+  entries(){
+    return Object.entries(this).values();
+  }
+
+  [Symbol.iterator]{
+    return this.entries();
+  }
+
+  keys(){}
+  
+};
+
+setProperty(Web,{Headers});
+
 const $body = Symbol('*body');
   
 const Response = class WebResponse {
