@@ -106,6 +106,10 @@ const Headers = class WebHeaders{
       return this;
     }
   }
+
+  get size(){
+    return Object.keys(this).length
+  }
   
   delete(key){
     if(!key)return;
@@ -154,7 +158,17 @@ const Headers = class WebHeaders{
     return this.entries();
   }
 
-  keys(){}
+  keys(){
+    return Object.keys(this).values();
+  }
+
+  values(){
+    return Object.values(this).values();
+  }
+
+  forEach(){
+    return new Map(this).forEach(...arguments);
+  }
   
 };
 
