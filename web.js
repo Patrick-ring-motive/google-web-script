@@ -1,3 +1,4 @@
+
 (() => {
     globalThis.Web = class Web {};
     const setProperty = (object, property) => {
@@ -28,6 +29,14 @@
     const isBuffer = x => instanceOf(x, ArrayBuffer) || x?.constructor?.name == 'ArrayBuffer';
     const isArray = x => Array.isArray(x) || instanceOf(x, Array) || x?.constructor?.name == 'Array';
     const isString = x => typeof x === 'string' || instanceOf(x, String) || x?.constructor?.name == 'String';
+
+    const Str = x =>{
+      try{
+        return String(x);
+      }catch(_){
+        return JSON.stringify(x);
+      }
+    };
 
     function toBits(x) {
         if (isString(x)) {
@@ -114,9 +123,9 @@
 
         delete(key) {
             if (!key) return;
-            key = String(key).toLowerCase();
+            key = Str(key).toLowerCase();
             for (const k in this) {
-                if (String(k).toLowerCase() === key) {
+                if (Str(k).toLowerCase() === key) {
                     delete this[k];
                 }
             }
@@ -129,9 +138,9 @@
 
         get(key) {
             if (this[key]) return this[key];
-            key = String(key).toLowerCase();
+            key = Str(key).toLowerCase();
             for (const k in this) {
-                if (String(k).toLowerCase() === key) {
+                if (Str(k).toLowerCase() === key) {
                     return this[k];
                 }
             }
@@ -140,7 +149,7 @@
         getSetCookie() {
             const cookies = [];
             for (const key in this) {
-                if (String(key).toLowerCase() === 'set-cookie') {
+                if (Str(key).toLowerCase() === 'set-cookie') {
                     cookies.push(this[key]);
                 }
             }
@@ -148,7 +157,7 @@
         }
 
         getAll(head) {
-            head = String(head).toLowerCase();
+            head = Str(head).toLowerCase();
             if (/^(set-)?cookie$/.test(key)) {
                 const cookies = [];
                 for (const key in this) {
@@ -165,9 +174,9 @@
 
         has(key) {
             if (this[key] != undefined) true;
-            key = String(key).toLowerCase();
+            key = Str(key).toLowerCase();
             for (const k in this) {
-                if (String(k).toLowerCase() === key && this[k] != undefined) {
+                if (Str(k).toLowerCase() === key && this[k] != undefined) {
                     return true;
                 }
             }
@@ -175,7 +184,7 @@
         }
 
         append(key, value) {
-            key = String(key).toLowerCase();
+            key = Str(key).toLowerCase();
             if (/^(set-)?cookie$/.test(key)) {
                 while (this[key] != undefined) key = key.replace(/./g, x => x[`to${Math.random()>.5?'Upp':'Low'}erCase`]());
                 this[key] = value;
@@ -183,7 +192,7 @@
                 if (this[key] == undefined) {
                     this[key] = value;
                 } else {
-                    this[key] = `${this[key]}, ${value}`;
+                    this[key] = `${Str(this[key])}, ${Str(value)}`;
                 }
             }
         }
@@ -292,3 +301,4 @@
     });
 
 })();
+
