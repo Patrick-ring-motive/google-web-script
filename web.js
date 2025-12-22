@@ -67,7 +67,7 @@
             if (isString(parts)) {
                 return super(parts, type, name);
             }
-            return super(toBits(parts), type, name);
+            return Object.setPrototypeOf(super(toBits(parts), type, name),Web.Blob.prototype);
         }
 
         get size() {
@@ -113,7 +113,7 @@
                 for (const key in entries) {
                     this.append(key, entries[key]);
                 }
-                return this;
+                return Object.setPrototypeOf(this,Web.Headers.prototype);
             }
         }
 
@@ -292,8 +292,22 @@
             if (options.body) {
                 this[$body] = new Web.Blob(options.body);
             }
+            return Object.setPrototypeOf(this,Web.Request.prototype);
+        }
+        blob() {
+            return this[$body];
+        }
+        text() {
+            return this[$body].getDataAsString();
         }
 
+        bytes() {
+            return new Uint8Array(this[$body].getBytes());
+        }
+
+        arrayBuffer() {
+            return new Uint8Array(this[$body].getBytes()).buffer;
+        }
     };
 
     setProperty(Web, {
@@ -301,4 +315,3 @@
     });
 
 })();
-
