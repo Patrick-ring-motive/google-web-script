@@ -225,6 +225,7 @@
 
     const $body = Symbol('*body');
     const $status = Symbol('*status');
+    const $statusText = Symbol('*statusText');
     const $headers = Symbol('*headers');
 
     const Response = class WebResponse {
@@ -232,7 +233,13 @@
             Object.assign(this, options);
             this[$headers] = new Web.Headers(this.headers);
             if (body) {
-                this[$body] = new Web.Blob(body);
+                try{
+                  this[$body] = new Web.Blob(body);
+                }catch(e){
+                  this[$body] = new Web.Blob(Str(body));
+                  this[$status] = 500;
+                  this[$statusText] = Str(e);
+                }
             }
         }
         getAllHeaders() {
