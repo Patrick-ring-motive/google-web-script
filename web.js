@@ -374,4 +374,27 @@ const fetch = Object.setPrototypeOf(function WebFetch(url, options) {
         setProperty(Web, {
         fetch
     });
+
+    const defaultEvent = { 
+  queryString: '',
+  parameter: {},
+  parameters: {},
+  pathInfo: '',
+  contextPath: '',
+  postData: {
+     contents: '', 
+     length: 0, 
+     type: 'text/plain', 
+     name: 'postData' 
+  },
+  contentLength: 0 
+};
+
+const Event = class WebEvent{
+  constructor(e = {}){
+    Object.assign(this,{...defaultEvent, ...e});
+  }
+};
+
+    setProperty(Web,{Event});
 })();
