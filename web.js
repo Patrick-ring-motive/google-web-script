@@ -320,11 +320,12 @@
         text() {
             return this[$body].getDataAsString();
         }
-
+        json() {
+            return JSON.parse(this.getContentText());
+        }
         bytes() {
             return new Uint8Array(this[$body].getBytes());
         }
-
         arrayBuffer() {
             return new Uint8Array(this[$body].getBytes()).buffer;
         }
