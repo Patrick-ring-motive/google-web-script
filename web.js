@@ -33,8 +33,8 @@
     const Str = x =>{
       try{
         return String(x);
-      }catch(_){
-        return JSON.stringify(x);
+      }catch(e){
+        return String(e);
       }
     };
 
