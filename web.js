@@ -298,7 +298,7 @@
 
     const Request = class WebRequest extends UrlFetchApp.getRequest {
         constructor(url, options = {}) {
-            let $this = this;
+            let $this;
             options.method = options.method ?? 'GET';
             try{
               $this = super(...arguments);
