@@ -30,12 +30,12 @@
     const isArray = x => Array.isArray(x) || instanceOf(x, Array) || x?.constructor?.name == 'Array';
     const isString = x => typeof x === 'string' || instanceOf(x, String) || x?.constructor?.name == 'String';
 
-    const Str = x =>{
-      try{
-        return String(x);
-      }catch(e){
-        return String(e);
-      }
+    const Str = x => {
+        try {
+            return String(x);
+        } catch (e) {
+            return String(e);
+        }
     };
 
     function toBits(x) {
@@ -67,7 +67,7 @@
             if (isString(parts)) {
                 return super(parts, type, name);
             }
-            return Object.setPrototypeOf(super(toBits(parts), type, name),Web.Blob.prototype);
+            return Object.setPrototypeOf(super(toBits(parts), type, name), Web.Blob.prototype);
         }
 
         get size() {
@@ -113,7 +113,7 @@
                 for (const key in entries) {
                     this.append(key, entries[key]);
                 }
-                return Object.setPrototypeOf(this,Web.Headers.prototype);
+                return Object.setPrototypeOf(this, Web.Headers.prototype);
             }
         }
 
@@ -235,12 +235,12 @@
             this[$status] = options.status;
             this[$statusText] = options.statusText;
             if (body) {
-                try{
-                  this[$body] = new Web.Blob(body);
-                }catch(e){
-                  this[$body] = new Web.Blob(Str(body));
-                  this[$status] = 500;
-                  this[$statusText] = Str(e);
+                try {
+                    this[$body] = new Web.Blob(body);
+                } catch (e) {
+                    this[$body] = new Web.Blob(Str(body));
+                    this[$status] = 500;
+                    this[$statusText] = Str(e);
                 }
             }
         }
@@ -283,8 +283,8 @@
         get status() {
             return this.getResponseCode();
         }
-        get statusText(){
-            if(this.status == 200){
+        get statusText() {
+            if (this.status == 200) {
                 return 'Ok';
             }
             return this[$statusText] || Str(this.status);
@@ -302,25 +302,27 @@
         constructor(url, options = {}) {
             let $this;
             options.method = options.method ?? 'GET';
-            if(options?.body && !options?.payload){
+            if (options?.body && !options?.payload) {
                 options.payload = options.body;
             }
-            if(options?.payload && !options?.body){
+            if (options?.payload && !options?.body) {
                 options.body = options.payload;
             }
-            try{
-              $this = super(...arguments);
-              $this.url = url;
-              Object.assign($this, options??{});
-              $this.headers = new Web.Headers(options.headers);
-              if (options?.body) {
-                $this[$body] = new Web.Blob(options.body);
-              }
-            }catch(e){
-              $this = super('https://Request.Error',{body:Str(e)});
-              $this[$body] = new Web.Blob(Str(e));
+            try {
+                $this = super(...arguments);
+                $this.url = url;
+                Object.assign($this, options ?? {});
+                $this.headers = new Web.Headers(options.headers);
+                if (options?.body) {
+                    $this[$body] = new Web.Blob(options.body);
+                }
+            } catch (e) {
+                $this = super('https://Request.Error', {
+                    body: Str(e)
+                });
+                $this[$body] = new Web.Blob(Str(e));
             }
-            return Object.setPrototypeOf($this,Web.Request.prototype);
+            return Object.setPrototypeOf($this, Web.Request.prototype);
         }
         blob() {
             return this[$body];
@@ -344,57 +346,65 @@
     });
 
 
-const defaultOptions = {
-  validateHttpsCertificates : false,
-  muteHttpExceptions : true,
-  escaping : false,
-};
+    const defaultOptions = {
+        validateHttpsCertificates: false,
+        muteHttpExceptions: true,
+        escaping: false,
+    };
 
 
-const fetch = Object.setPrototypeOf(function WebFetch(url, options) {
-    const requestOptions = {...defaultOptions, ...options??{}};
-    const request = new Web.Request(url,requestOptions);
-    try {
-      const response = UrlFetchApp.fetch(Str(url), requestOptions);
-      const status = response.getResponseCode();
-      if(requestOptions.muteHttpExceptions == false && (status  >= 400 || status <= 0 || !status)){
-        throw new Error(`Fetch error ${Str(status)}`);
-      }
-      return Object.setPrototypeOf(response,Web.Response.prototype);
-    } catch (e) {
-      if(requestOptions.muteHttpExceptions == false){
-        throw e;
-      }
-      return new Web.Response(`500 ${Str(e)}`, {
-        status: 500,
-        statusText:Str(e)
-      });
-    }
-},UrlFetchApp.fetch);
-        setProperty(Web, {
+    const fetch = Object.setPrototypeOf(function WebFetch(url, options) {
+        const requestOptions = {
+            ...defaultOptions,
+            ...options ?? {}
+        };
+        const request = new Web.Request(url, requestOptions);
+        try {
+            const response = UrlFetchApp.fetch(Str(url), requestOptions);
+            const status = response.getResponseCode();
+            if (requestOptions.muteHttpExceptions == false && (status >= 400 || status <= 0 || !status)) {
+                throw new Error(`Fetch error ${Str(status)}`);
+            }
+            return Object.setPrototypeOf(response, Web.Response.prototype);
+        } catch (e) {
+            if (requestOptions.muteHttpExceptions == false) {
+                throw e;
+            }
+            return new Web.Response(`500 ${Str(e)}`, {
+                status: 500,
+                statusText: Str(e)
+            });
+        }
+    }, UrlFetchApp.fetch);
+    setProperty(Web, {
         fetch
     });
 
-    const defaultEvent = { 
-  queryString: '',
-  parameter: {},
-  parameters: {},
-  pathInfo: '',
-  contextPath: '',
-  postData: {
-     contents: '', 
-     length: 0, 
-     type: 'text/plain', 
-     name: 'postData' 
-  },
-  contentLength: 0 
-};
+    const defaultEvent = {
+        queryString: '',
+        parameter: {},
+        parameters: {},
+        pathInfo: '',
+        contextPath: '',
+        postData: {
+            contents: '',
+            length: 0,
+            type: 'text/plain',
+            name: 'postData'
+        },
+        contentLength: 0
+    };
 
-const RequestEvent = class WebRequestEvent{
-  constructor(e = {}){
-    Object.assign(this,{...defaultEvent, ...e});
-  }
-};
+    const RequestEvent = class WebRequestEvent {
+        constructor(e = {}) {
+            Object.assign(this, {
+                ...defaultEvent,
+                ...e
+            });
+        }
+    };
 
-    setProperty(Web,{Event});
+    setProperty(Web, {
+        RequestEvent
+    });
 })();
