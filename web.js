@@ -351,7 +351,7 @@ const defaultOptions = {
 };
 
 
-const fetch = function WebFetch(url, options) {
+const fetch = Object.setPrototypeOf(function WebFetch(url, options) {
     const requestOptions = {...defaultOptions, ...options??{}};
     const request = new Web.Request(url,requestOptions);
     try {
@@ -370,7 +370,7 @@ const fetch = function WebFetch(url, options) {
         statusText:Str(e)
       });
     }
-};
+},UrlFetchApp.fetch);
         setProperty(Web, {
         fetch
     });
