@@ -1,6 +1,6 @@
 
 (() => {
-    globalThis.Web = class Web {};
+    globalThis.Web = globalThis.Web || class Web {};
     const setProperty = (object, property) => {
         const [key, value] = Object.entries(property).pop()
         return Object.defineProperty(object, key, {
