@@ -232,6 +232,8 @@
         constructor(body, options = {}) {
             Object.assign(this, options);
             this[$headers] = new Web.Headers(this.headers);
+            this[$status] = options.status;
+            this[$statusText] = options.statusText;
             if (body) {
                 try{
                   this[$body] = new Web.Blob(body);
@@ -300,12 +302,18 @@
         constructor(url, options = {}) {
             let $this;
             options.method = options.method ?? 'GET';
+            if(options?.body && !options?.payload){
+                options.payload = options.body;
+            }
+            if(options?.payload && !options?.body){
+                options.body = options.payload;
+            }
             try{
               $this = super(...arguments);
               $this.url = url;
-              Object.assign($this, options);
+              Object.assign($this, options??{});
               $this.headers = new Web.Headers(options.headers);
-              if (options.body) {
+              if (options?.body) {
                 $this[$body] = new Web.Blob(options.body);
               }
             }catch(e){
@@ -335,4 +343,35 @@
         Request
     });
 
+
+const defaultOptions = {
+  validateHttpsCertificates : false,
+  muteHttpExceptions : true,
+  escaping : false,
+};
+
+
+const fetch = function WebFetch(url, options) {
+    const requestOptions = {...defaultOptions, ...options??{}};
+    const request = new Web.Request(url,requestOptions);
+    try {
+      const response = UrlFetchApp.fetch(Str(url), requestOptions);
+      const status = response.getResponseCode();
+      if(requestOptions.muteHttpExceptions == false && (status  >= 400 || status <= 0 || !status)){
+        throw new Error(`Fetch error ${Str(status)}`);
+      }
+      return Object.setPrototypeOf(response,Web.Response.prototype);
+    } catch (e) {
+      if(requestOptions.muteHttpExceptions == false){
+        throw e;
+      }
+      return new Web.Response(`500 ${Str(e)}`, {
+        status: 500,
+        statusText:Str(e)
+      });
+    }
+};
+        setProperty(Web, {
+        fetch
+    });
 })();
