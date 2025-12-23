@@ -390,7 +390,7 @@ const fetch = Object.setPrototypeOf(function WebFetch(url, options) {
   contentLength: 0 
 };
 
-const Event = class WebEvent{
+const RequestEvent = class WebRequestEvent{
   constructor(e = {}){
     Object.assign(this,{...defaultEvent, ...e});
   }
