@@ -298,14 +298,21 @@
 
     const Request = class WebRequest extends UrlFetchApp.getRequest {
         constructor(url, options = {}) {
-            super(...arguments);
-            this.url = url;
-            Object.assign(this, options);
-            this.headers = new Web.Headers(options.headers);
-            if (options.body) {
-                this[$body] = new Web.Blob(options.body);
+            let $this = this;
+            options.method = options.method ?? 'GET';
+            try{
+              $this = super(...arguments);
+              $this.url = url;
+              Object.assign($this, options);
+              $this.headers = new Web.Headers(options.headers);
+              if (options.body) {
+                $this[$body] = new Web.Blob(options.body);
+              }
+            }catch(e){
+              $this = super('https://Request.Error',{body:Str(e)});
+              $this[$body] = new Web.Blob(Str(e));
             }
-            return Object.setPrototypeOf(this,Web.Request.prototype);
+            return Object.setPrototypeOf($this,Web.Request.prototype);
         }
         blob() {
             return this[$body];
