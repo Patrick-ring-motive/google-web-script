@@ -281,6 +281,12 @@
         get status() {
             return this.getResponseCode();
         }
+        get statusText(){
+            if(this.status == 200){
+                return 'Ok';
+            }
+            return this[$statusText] || Str(this.status);
+        }
         get ok() {
             return this.status >= 200 && this.status < 300;
         }
