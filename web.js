@@ -104,6 +104,29 @@
     };
 
     /**
+     * Validates if a header key-value pair is acceptable to UrlFetchApp
+     * 
+     * WHY THIS EXISTS: UrlFetchApp is strict about what headers it accepts.
+     * Some header names or values that seem valid will cause UrlFetchApp to throw.
+     * By testing with UrlFetchApp.getRequest(), we can validate headers before
+     * actually using them, preventing runtime errors during fetch operations.
+     * 
+     * @param {string} key - Header name
+     * @param {string} value - Header value
+     * @returns {boolean} True if header is valid
+     */
+    function isValidHeader(key, value) {
+        try {
+            const headers = {};
+            headers[key] = value;
+            UrlFetchApp.getRequest('https://is.Valid.Header', { headers });
+            return true;
+        } catch (_) {
+            return false;
+        }
+    }
+
+    /**
      * Converts various data types to byte arrays
      * Handles strings, ArrayBuffers, Uint8Arrays, and objects with getBytes() methods
      * 
@@ -152,6 +175,14 @@
      * The setPrototypeOf calls ensure the Web API methods are available even when
      * the native Blob constructor doesn't cooperate with normal class extension.
      */
+
+    const blobArgs = (args) => {
+        if(!args[2])args = args.slice(0,2);
+        if(!args[1])args = args.slice(0,1);
+        if(!args[0])args = [];
+        return args;
+    }
+
     const Blob = class WebBlob extends Utilities.newBlob {
 
         /**
@@ -162,20 +193,24 @@
          */
         constructor(parts = [], type, name) {
             // Extract type from various sources
+            try{
             type = type?.type ?? type ?? parts?.type ?? parts?.getContentType?.();
             
             // Empty blob
             if (!len(parts)) {
-                return super(parts, type, name);
+                return Object.setPrototypeOf(super(...blobArgs([parts, type, name])), Web.Blob.prototype);
             }
             
             // String blob
             if (isString(parts)) {
-                return super(parts, type, name);
+                return Object.setPrototypeOf(super(...blobArgs([parts, type, name])), Web.Blob.prototype);
             }
             
             // Convert to bytes and create blob
-            return Object.setPrototypeOf(super(toBits(parts), type, name), Web.Blob.prototype);
+                return Object.setPrototypeOf(super(...blobArgs([toBits(parts), type, name])), Web.Blob.prototype);
+            }   catch(e){
+                return Object.setPrototypeOf(super(parts), Web.Blob.prototype);
+            }
         }
 
         /**
@@ -299,6 +334,10 @@
          * @param {string} value - Header value
          */
         set(key, value) {
+            // Validate header before setting
+            if (!isValidHeader(key, value)) {
+                return; // Skip invalid headers silently
+            }
             this.delete(key);
             this[String(key).toLowerCase()] = value;
         }
@@ -345,7 +384,7 @@
             if (/^(set-)?cookie$/.test(head)) {
                 const cookies = [];
                 for (const key in this) {
-                    if (String(key).toLowerCase() === head) {
+                    if (Str(key).toLowerCase() === head) {
                         cookies.push(this[key]);
                     }
                 }
@@ -355,7 +394,7 @@
             // Regular headers - split by comma
             const value = this.get(head);
             if (value == undefined) return [];
-            return String(value).split(',').map(x => x.trim());
+            return Str(value).split(',').map(x => x.trim());
         }
 
         /**
@@ -389,6 +428,11 @@
          * @param {string} value - Header value to append
          */
         append(key, value) {
+            // Validate header before appending
+            if (!isValidHeader(key, value)) {
+                return; // Skip invalid headers silently
+            }
+            
             key = Str(key).toLowerCase();
             
             // Special handling for cookies - each cookie gets a unique key with random casing
@@ -468,18 +512,19 @@
     /**
      * Web.Response - HTTP Response object with Web API compatibility
      */
-    const Response = class WebResponse {
+    const Response = class WebResponse extends ContentService.createTextOutput{
 
         /**
          * Creates a new Response object
          * @param {*} body - Response body
          * @param {Object} options - Response options (status, statusText, headers)
          */
-        constructor(body, options = {}) {
+        constructor(body, options = {}) {;
+            super(body);
             Object.assign(this, options);
             this[$headers] = new Web.Headers(this.headers);
-            this[$status] = options.status;
-            this[$statusText] = options.statusText;
+            this[$status] = options.status ?? 200;
+            this[$statusText] = options.statusText ?? 'OK';
             
             // Handle body with error catching
             if (body) {
@@ -489,8 +534,11 @@
                     this[$body] = new Web.Blob(Str(body));
                     this[$status] = 500;
                     this[$statusText] = Str(e);
+                    setProperty(this, { status: this[$status] });
+                    setProperty(this, { statusText: this[$statusText] } );
                 }
             }
+            return Object.setPrototypeOf(this, Web.Response.prototype) ;
         }
 
         /**
@@ -542,7 +590,7 @@
                 }
                 // Handle case where cookies might already be an array from native method
                 const value = headers[key];
-                if (Array.isArray(value)) {
+                if (isArray(value)) {
                     cookieGroups[lowerKey].push(...value);
                 } else {
                     cookieGroups[lowerKey].push(value);
@@ -575,6 +623,10 @@
          */
         get headers() {
             return this.getHeaders();
+        }
+
+        set headers(value) {
+            this[$headers] = new Web.Headers(value);
         }
 
         /**
@@ -660,15 +712,23 @@
             return this.getResponseCode();
         }
 
+        set status(value) {
+            return this[$status] = value;
+        }
+
         /**
          * Gets HTTP status text
          * @returns {string} Status text
          */
         get statusText() {
             if (this.status == 200) {
-                return 'Ok';
+                return 'OK';
             }
             return this[$statusText] || Str(this.status);
+        }
+
+        set statusText(value) {
+            return this[$statusText] = value;
         }
 
         /**
@@ -711,6 +771,159 @@
     };
 
     setProperty(Web, { Response });
+
+
+    const canParseJSON = x =>{
+        try {
+            JSON.parse(x);
+            return true; 
+        } catch {
+            return false;
+        }
+    };
+
+    const canParseCSV = x =>{
+        try {
+            Utilities.parseCsv(x);
+            return true;
+        } catch {
+            return false;
+        }
+    };
+
+    const canCompileXML = x =>{
+        try {
+            XmlService.parse(x);
+            return true;
+        } catch {
+            return false;
+        }
+    };
+
+    const canCompile = x =>{
+        try {
+            new Function(x);
+            return true;
+        } catch {
+            return false;
+        }
+    };
+
+    /**
+     * Web.ResponseEvent - Response wrapper for returning from doGet/doPost handlers
+     * 
+     * WHY THIS EXISTS: Google Apps Script web apps must return specific types from
+     * doGet/doPost (like ContentService.createTextOutput or HtmlService output).
+     * This class extends Web.Response and uses ContentService.createTextOutput to
+     * create a response that can be returned directly from doGet/doPost while still
+     * maintaining all Web.Response methods and properties.
+     * 
+     * This allows bidirectional compatibility: Web.Response can be used for outgoing
+     * requests (with fetch), and ResponseEvent can be used for incoming request handlers.
+     * 
+     * Example usage:
+     *   function doPost(e) {
+     *     const request = new Web.RequestEvent(e);
+     *     const data = request.json();
+     *     const response = new Web.Response(JSON.stringify({ success: true }), {
+     *       status: 200,
+     *       headers: { 'Content-Type': 'application/json' }
+     *     });
+     *     return new Web.ResponseEvent(response);
+     *   }
+     */
+    const ResponseEvent = class WebResponseEvent extends Web.Response {
+
+        /**
+         * Creates a new ResponseEvent from a Web.Response
+         * @param {Web.Response} response - A Web.Response object to wrap
+         */
+        constructor(response) {
+            // Extract data from the response
+            const bodyBlob = response.blob?.();
+            const bodyText = bodyBlob?.text?.() || response.text?.() || '';
+            const status = response.status;
+            const statusText = response.statusText;
+            const headers = response.headers ?? {};
+            
+            // Call parent constructor with text, not blob
+            super(bodyText, { status, statusText, headers });
+            
+            // Create ContentService output with the body text
+            let output = this
+            
+            // Determine content type from header or infer from body content
+            let contentType = headers?.get?.('Content-Type') || headers?.['content-type'] || bodyBlob?.getContentType?.();
+            let mimeType;
+            // If no content-type header, try to infer from body content
+            if (!contentType) {
+                if (canParseJSON(bodyText)) {
+                    contentType = 'application/json';
+                    mimeType = ContentService.MimeType.JSON;
+                } else if (canCompileXML(bodyText)) {
+                    contentType = 'text/xml';
+                    // Will be handled later for HTML output
+                } else if (canParseCSV(bodyText)) {
+                    contentType = 'text/csv';
+                    mimeType = ContentService.MimeType.CSV;
+                } else if (canCompile(bodyText)) {
+                    contentType = 'application/javascript';
+                    mimeType = ContentService.MimeType.JAVASCRIPT;
+                } else {
+                    contentType = 'text/plain';
+                    mimeType = ContentService.MimeType.TEXT;
+                }
+            }
+            
+            // Match content type to ContentService.MimeType enum
+            if (!mimeType) {
+                const ct = Str(contentType).toLowerCase();
+                for(const [key, value] of Object.entries(ContentService.MimeType)) {
+                    if (ct.includes(Str(key).toLowerCase())) {
+                        mimeType = value;
+                    }
+                }
+            }
+            
+            // Special handling for script content types
+            if(!mimeType && /script/i.test(contentType)) {
+                mimeType = ContentService.MimeType.JAVASCRIPT;
+            }
+
+            // Try to infer from body if still no mime type
+            if(((ContentService.MimeType.TEXT == mimeType) || !mimeType) && bodyText){
+                if(canParseJSON(bodyText)){
+                    mimeType = ContentService.MimeType.JSON;
+                }else if(canCompile(bodyText)){
+                    mimeType = ContentService.MimeType.JAVASCRIPT;
+                }else if(canParseCSV(bodyText)){
+                    mimeType = ContentService.MimeType.CSV;
+                }
+            }
+            
+            // Set the mime type or fall back to downloadAsFile
+            if(mimeType){
+                output.setMimeType(mimeType);
+            } else if (contentType) {
+                try{
+                    output.downloadAsFile(contentType);
+                }catch(e){
+                    console.warn('Could not set downloadAsFile for contentType:', contentType, e);
+                }
+                output.setMimeType(ContentService.MimeType.TEXT);
+            }
+
+            // Use HtmlService for XML/HTML content
+            if(canCompileXML(bodyText) || /xml|html/i.test(contentType)){
+                output = HtmlService.createHtmlOutput(bodyText);        
+            }
+            
+            return Object.setPrototypeOf(this, Web.ResponseEvent.prototype) ;
+        }
+
+    };
+
+    setProperty(Web, { ResponseEvent });
 
     /**
      * Web.Request - HTTP Request object with Web API compatibility
@@ -775,6 +988,8 @@
                     body: Str(e)
                 });
                 $this[$body] = new Web.Blob(Str(e));
+                setProperty($this, { body: $this[$body] });
+                throw e;
             }
             
             return Object.setPrototypeOf($this, Web.Request.prototype);
@@ -1004,35 +1219,36 @@
             const url = baseUrl + eventData.pathInfo + 
                 (eventData.queryString ? '?' + eventData.queryString : '');
             
-            // Build headers from event data and ScriptApp properties
-            const headers = {};
+            // Build headers from event data and ScriptApp properties using Web.Headers
+            // This ensures all headers are validated via isValidHeader before being set
+            const headers = new Web.Headers();
             
             // Content headers
             if (eventData.postData?.type) {
-                headers['Content-Type'] = eventData.postData.type;
+                headers.set('Content-Type', eventData.postData.type);
             }
             if (eventData.contentLength || eventData.postData?.length) {
-                headers['Content-Length'] = Str(eventData.contentLength || eventData.postData.length);
+                headers.set('Content-Length', Str(eventData.contentLength || eventData.postData.length));
             }
             if (eventData.postData?.name) {
-                headers['Content-Name'] = eventData.postData.name;
+                headers.set('Content-Name', eventData.postData.name);
             }
             
             // ScriptApp metadata headers (safe access in case not available)
             try {
-                headers['X-ScriptApp-AuthMode'] = Str(eventData.authMode ?? ScriptApp.AuthMode);
-                headers['X-ScriptApp-AuthorizationStatus'] = Str(eventData.authorizationStatus ?? ScriptApp.AuthorizationStatus);
-                headers['X-ScriptApp-EventType'] = Str(eventData.triggerSource ?? ScriptApp.TriggerSource);
-                headers['X-ScriptApp-WeekDay'] = Str(eventData.weekDay ?? ScriptApp.WeekDay);
+                headers.set('X-ScriptApp-AuthMode', Str(eventData.authMode ?? ScriptApp.AuthMode));
+                headers.set('X-ScriptApp-AuthorizationStatus', Str(eventData.authorizationStatus ?? ScriptApp.AuthorizationStatus));
+                headers.set('X-ScriptApp-EventType', Str(eventData.triggerSource ?? ScriptApp.TriggerSource));
+                headers.set('X-ScriptApp-WeekDay', Str(eventData.weekDay ?? ScriptApp.WeekDay));
                 if (ScriptApp.InstallationSource) {
-                    headers['X-ScriptApp-InstallationSource'] = Str(ScriptApp.InstallationSource);
+                    headers.set('X-ScriptApp-InstallationSource', Str(ScriptApp.InstallationSource));
                 }
                 // Get authorization info if authMode is available
 
                 try {
                     const authInfo = ScriptApp.getAuthorizationInfo(eventData.authMode ?? ScriptApp.AuthMode);
                     if (authInfo) {
-                        headers['X-ScriptApp-AuthorizationInfo'] = Str(authInfo.getAuthorizationStatus());
+                        headers.set('X-ScriptApp-AuthorizationInfo', Str(authInfo.getAuthorizationStatus()));
                     }
                 } catch (_) {
                     // Authorization info not available
@@ -1103,5 +1319,96 @@
     };
 
     setProperty(Web, { RequestEvent });
+
+    /**
+     * Web.do - Universal handler wrapper for doGet/doPost
+     * 
+     * WHY THIS EXISTS: This function allows you to write a single handler that works
+     * for both doGet() and doPost() while automatically handling request/response
+     * conversion. It takes a request (raw event or RequestEvent), processes it through
+     * your handler function, and returns a properly formatted response that Google
+     * Apps Script can return from doGet/doPost.
+     * 
+     * This eliminates boilerplate and ensures consistent request/response handling.
+     * 
+     * Example usage:
+     *   function doGet(e) { return Web.do(e); }
+     *   function doPost(e) { return Web.do(e); }
+     * 
+     *   Or with a custom handler:
+     *   function doGet(e) { 
+     *     return Web.do(e, (request) => {
+     *       const data = request.json();
+     *       return new Web.Response(JSON.stringify({ received: data }), {
+     *         headers: { 'Content-Type': 'application/json' }
+     *       });
+     *     });
+     *   }
+     * 
+     * @param {Object|Web.RequestEvent} request - Raw event object or RequestEvent
+     * @param {Function} handler - Optional handler function that receives RequestEvent and returns Response
+     * @returns {ContentService.TextOutput|HtmlService.HtmlOutput} Formatted output for Apps Script
+     */
+    const WebDo = function WebDo(request, handler) {
+        try {
+            // Convert to RequestEvent if not already
+            const req = instanceOf(request,Web.RequestEvent)
+                ? request 
+                : new Web.RequestEvent(request);
+            
+            // If handler provided, call it and wrap response
+            if (handler && typeof handler === 'function') {
+                const response = handler(req);
+                
+                // If response is already a ResponseEvent, return it
+                if (instanceOf(response, Web.ResponseEvent)) {
+                    return response;
+                }
+                
+                // If response is a Web.Response, wrap it
+                if (instanceOf(response, Web.Response)) {
+                    return new Web.ResponseEvent(response);
+                }
+                
+                // If response is already a ContentService/HtmlService output, return as-is
+                if (response?.getContent || response?.getAs) {
+                    return response;
+                }
+                
+                // Otherwise, create a response from the returned value
+                return new Web.ResponseEvent(new Web.Response(response, {
+                    headers: { 'Content-Type': 'text/plain' }
+                }));
+            }
+            
+            // No handler provided - return a default response with request info
+            const defaultResponse = new Web.Response(JSON.stringify({
+                method: req.method,
+                url: req.url,
+                parameters: req.parameters,
+                message: 'No handler provided to Web.do()'
+            }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            return new Web.ResponseEvent(defaultResponse);
+            
+        } catch (error) {
+            // Error handling - return error response
+            const errorResponse = new Web.Response(JSON.stringify({
+                error: Str(error),
+                message: error.message || 'An error occurred',
+                stack: error.stack
+            }), {
+                status: 500,
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            return new Web.ResponseEvent(errorResponse);
+        }
+    };
+
+    setProperty(Web, { do: WebDo });
 
 })();
