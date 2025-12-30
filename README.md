@@ -8,12 +8,12 @@ A Web API polyfill library for Google Apps Script that brings familiar browser-b
 
 ## Features
 
-- ✅ **Web.fetch()** - Fetch API implementation using UrlFetchApp
-- ✅ **Web.Blob** - Web Blob API compatible with Google Apps Script
-- ✅ **Web.Headers** - HTTP Headers management with Web API methods
-- ✅ **Web.Request** - Request objects with standard Web API interface
-- ✅ **Web.Response** - Response objects with methods like `.json()`, `.text()`, `.blob()`
-- ✅ **Web.RequestEvent** - Event handling for web requests
+-  **Web.fetch()** - Fetch API implementation using UrlFetchApp
+-  **Web.Blob** - Web Blob API compatible with Google Apps Script
+-  **Web.Headers** - HTTP Headers management with Web API methods
+-  **Web.Request** - Request objects with standard Web API interface
+-  **Web.Response** - Response objects with methods like `.json()`, `.text()`, `.blob()`
+-  **Web.RequestEvent** - Event handling for web requests
 
 ## Installation
 
