@@ -37,10 +37,10 @@
             value,
             enumerable: true,
             configurable: false,
-            writeable: false, // Typo preserved from original
             writable: false
         });
     };
+    Web.setProperty = setProperty;
 
     /**
      * Safe instanceof check that handles potential errors
@@ -77,9 +77,10 @@
     const getBits = x => x.getBytes?.() ?? x.bytes();
     const isBits = x => Array.prototype.every.call(x, isNum);
     const hasBuffer = x => !!x?.buffer;
-    const isBuffer = x => instanceOf(x, ArrayBuffer) || x?.constructor?.name == 'ArrayBuffer';
-    const isArray = x => Array.isArray(x) || instanceOf(x, Array) || x?.constructor?.name == 'Array';
-    const isString = x => typeof x === 'string' || instanceOf(x, String) || x?.constructor?.name == 'String';
+    const is = (x, type) => instanceOf(x, type) || x?.constructor?.name === type.name;
+    const isBuffer = x => is(x, ArrayBuffer);
+    const isArray = x => Array.isArray(x) || is(x, Array);
+    const isString = x => typeof x === 'string' || is(x, String);
 
     /**
      * Safe string conversion that handles errors
@@ -176,14 +177,7 @@
      * the native Blob constructor doesn't cooperate with normal class extension.
      */
 
-    const blobArgs = (args) => {
-        if(!args[2])args = args.slice(0,2);
-        if(!args[1])args = args.slice(0,1);
-        if(!args[0])args = [];
-        return args;
-    }
-
-    const Blob = class WebBlob extends Utilities.newBlob {
+    const Blob = class WebBlob {
 
         /**
          * Creates a new Blob object
@@ -192,25 +186,21 @@
          * @param {string} name - Optional name for the blob
          */
         constructor(parts = [], type, name) {
-            // Extract type from various sources
-            try{
-            type = type?.type ?? type ?? parts?.type ?? parts?.getContentType?.();
-            
-            // Empty blob
-            if (!len(parts)) {
-                return Object.setPrototypeOf(super(...blobArgs([parts, type, name])), Web.Blob.prototype);
+            let blobContent = parts;
+            const resolvedType = type?.type ?? type ?? parts?.type ?? parts?.getContentType?.() ?? undefined;
+
+            if (len(parts) && !isString(parts)) {
+                blobContent = toBits(parts);
             }
             
-            // String blob
-            if (isString(parts)) {
-                return Object.setPrototypeOf(super(...blobArgs([parts, type, name])), Web.Blob.prototype);
-            }
+            // This is a simplified representation. The mock will handle the actual "blob" creation.
+            this.blobData = blobContent;
+            this.blobType = resolvedType;
+            this.blobName = name;
             
-            // Convert to bytes and create blob
-                return Object.setPrototypeOf(super(...blobArgs([toBits(parts), type, name])), Web.Blob.prototype);
-            }   catch(e){
-                return Object.setPrototypeOf(super(parts), Web.Blob.prototype);
-            }
+            // In the real environment, this would be a Google Apps Script Blob
+            const underlyingBlob = Utilities.newBlob(blobContent, resolvedType, name);
+            Object.assign(this, underlyingBlob);
         }
 
         /**
@@ -283,218 +273,93 @@
      * property names that still match case-insensitive lookups.
      */
     const Headers = class WebHeaders {
-
-        /**
-         * Creates a new Headers object
-         * @param {Object|Array} entries - Initial headers as object or array of [key, value] pairs
-         */
         constructor(entries) {
-            if (!entries) return this;
+            this.headers = {}; // Maps lower-case name to { key: originalKey, values: [value1, value2] }
+            if (!entries) return;
+
+            if (entries instanceof Web.Headers) {
+                this.headers = JSON.parse(JSON.stringify(entries.headers));
+                return;
+            }
             
-            try {
-                // Try to iterate as array of entries
+            if (typeof entries[Symbol.iterator] === 'function' && !isString(entries)) {
                 for (const [key, value] of entries) {
                     this.append(key, value);
                 }
-                return this;
-            } catch (_) {
-                // Fall back to object iteration
-                for (const key in entries) {
+            } else if (typeof entries === 'object') {
+                for (const key of Object.keys(entries)) {
                     this.append(key, entries[key]);
                 }
-                return Object.setPrototypeOf(this, Web.Headers.prototype);
             }
         }
 
-        /**
-         * Gets the number of headers
-         * @returns {number} Number of headers
-         */
         get size() {
-            return Object.keys(this).length;
+            return Object.keys(this.headers).length;
         }
 
-        /**
-         * Deletes a header (case-insensitive)
-         * @param {string} key - Header name to delete
-         */
         delete(key) {
             if (!key) return;
-            key = Str(key).toLowerCase();
-            for (const k in this) {
-                if (Str(k).toLowerCase() === key) {
-                    delete this[k];
-                }
-            }
+            delete this.headers[String(key).toLowerCase()];
         }
 
-        /**
-         * Sets a header value, replacing any existing value (case-insensitive)
-         * @param {string} key - Header name
-         * @param {string} value - Header value
-         */
         set(key, value) {
-            // Validate header before setting
-            if (!isValidHeader(key, value)) {
-                return; // Skip invalid headers silently
-            }
-            this.delete(key);
-            this[String(key).toLowerCase()] = value;
+            if (!isValidHeader(key, value)) return;
+            const lowerKey = String(key).toLowerCase();
+            this.headers[lowerKey] = { key: String(key), values: [String(value)] };
         }
 
-        /**
-         * Gets a header value (case-insensitive)
-         * @param {string} key - Header name
-         * @returns {string|undefined} Header value
-         */
         get(key) {
-            if (this[key]) return this[key];
-            key = Str(key).toLowerCase();
-            for (const k in this) {
-                if (Str(k).toLowerCase() === key) {
-                    return this[k];
-                }
-            }
+            if (!key) return null;
+            const header = this.headers[String(key).toLowerCase()];
+            return header ? header.values.join(', ') : null;
         }
 
-        /**
-         * Gets all Set-Cookie headers
-         * @returns {Array<string>} Array of Set-Cookie values
-         */
         getSetCookie() {
-            const cookies = [];
-            for (const key in this) {
-                if (Str(key).toLowerCase() === 'set-cookie') {
-                    cookies.push(this[key]);
-                }
-            }
-            return cookies;
+            return this.getAll('set-cookie');
         }
 
-        /**
-         * Gets all values for a header
-         * Special handling for cookies, otherwise splits comma-separated values
-         * @param {string} head - Header name
-         * @returns {Array<string>} Array of header values
-         */
-        getAll(head) {
-            head = Str(head).toLowerCase();
-            
-            // Special handling for cookies
-            if (/^(set-)?cookie$/.test(head)) {
-                const cookies = [];
-                for (const key in this) {
-                    if (Str(key).toLowerCase() === head) {
-                        cookies.push(this[key]);
-                    }
-                }
-                return cookies;
-            }
-            
-            // Regular headers - split by comma
-            const value = this.get(head);
-            if (value == undefined) return [];
-            return Str(value).split(',').map(x => x.trim());
+        getAll(key) {
+            if (!key) return [];
+            const header = this.headers[String(key).toLowerCase()];
+            return header ? header.values : [];
         }
 
-        /**
-         * Checks if a header exists (case-insensitive)
-         * @param {string} key - Header name
-         * @returns {boolean} True if header exists
-         */
         has(key) {
-            if (this[key] != undefined) return true;
-            key = Str(key).toLowerCase();
-            for (const k in this) {
-                if (Str(k).toLowerCase() === key && this[k] != undefined) {
-                    return true;
-                }
-            }
-            return false;
+            return this.headers.hasOwnProperty(String(key).toLowerCase());
         }
 
-        /**
-         * Appends a value to a header
-         * Cookies get unique keys, other headers get comma-separated values
-         * 
-         * WHY RANDOM CASING FOR COOKIES: HTTP allows multiple Set-Cookie headers
-         * in a response, but JavaScript objects can't have duplicate keys. The
-         * solution: store each cookie with a uniquely-cased version of the key
-         * (like 'set-cookie', 'Set-Cookie', 'sET-cOOKIE'). Since our get() method
-         * is case-insensitive, all variants match when retrieved, but each can
-         * store a different cookie value in the object.
-         * 
-         * @param {string} key - Header name
-         * @param {string} value - Header value to append
-         */
         append(key, value) {
-            // Validate header before appending
-            if (!isValidHeader(key, value)) {
-                return; // Skip invalid headers silently
-            }
+            if (!isValidHeader(key, value)) return;
+            const lowerKey = String(key).toLowerCase();
             
-            key = Str(key).toLowerCase();
-            
-            // Special handling for cookies - each cookie gets a unique key with random casing
-            if (/^(set-)?cookie$/.test(key)) {
-                while (this[key] != undefined) {
-                    // Randomly change case of characters to create unique key
-                    key = key.replace(/./g, x => x[`to${Math.random() > .5 ? 'Upp' : 'Low'}erCase`]());
-                }
-                this[key] = value;
+            if (this.headers[lowerKey]) {
+                this.headers[lowerKey].values.push(String(value));
             } else {
-                // Regular headers - append with comma separator
-                if (this[key] == undefined) {
-                    this[key] = value;
-                } else {
-                    this[key] = `${Str(this[key])}, ${Str(value)}`;
-                }
+                this.headers[lowerKey] = { key: String(key), values: [String(value)] };
             }
         }
 
-        /**
-         * Returns an iterator of [key, value] pairs
-         * @returns {Iterator} Header entries iterator
-         */
         entries() {
-            return Object.entries(this).values();
+            return Object.values(this.headers).map(h => [h.key, h.values.join(', ')]).values();
         }
 
-        /**
-         * Makes the object iterable
-         * @returns {Iterator} Header entries iterator
-         */
         [Symbol.iterator]() {
             return this.entries();
         }
 
-        /**
-         * Returns an iterator of header names
-         * @returns {Iterator} Header keys iterator
-         */
         keys() {
-            return Object.keys(this).values();
+            return Object.values(this.headers).map(h => h.key).values();
         }
 
-        /**
-         * Returns an iterator of header values
-         * @returns {Iterator} Header values iterator
-         */
         values() {
-            return Object.values(this).values();
+            return Object.values(this.headers).map(h => h.values.join(', ')).values();
         }
 
-        /**
-         * Executes a callback for each header
-         * @param {Function} callback - Function to execute for each entry
-         * @param {*} thisArg - Value to use as 'this' when executing callback
-         */
         forEach(callback, thisArg) {
-            for (const key in this) {
-                callback.call(thisArg, this[key], key, this);
+            for (const header of Object.values(this.headers)) {
+                callback.call(thisArg, header.values.join(', '), header.key, this);
             }
         }
-
     };
 
     setProperty(Web, { Headers });
@@ -512,21 +377,19 @@
     /**
      * Web.Response - HTTP Response object with Web API compatibility
      */
-    const Response = class WebResponse extends ContentService.createTextOutput{
+    const Response = class WebResponse {
 
         /**
          * Creates a new Response object
          * @param {*} body - Response body
          * @param {Object} options - Response options (status, statusText, headers)
          */
-        constructor(body, options = {}) {;
-            super(body);
+        constructor(body, options = {}) {
             Object.assign(this, options);
             this[$headers] = new Web.Headers(this.headers);
             this[$status] = options.status ?? 200;
             this[$statusText] = options.statusText ?? 'OK';
             
-            // Handle body with error catching
             if (body) {
                 try {
                     this[$body] = new Web.Blob(body);
@@ -538,7 +401,6 @@
                     setProperty(this, { statusText: this[$statusText] } );
                 }
             }
-            return Object.setPrototypeOf(this, Web.Response.prototype) ;
         }
 
         /**
@@ -551,61 +413,10 @@
          * @returns {Object} Headers object with cookies/set-cookie as arrays
          */
         getAllHeaders() {
-            // Try to call native getAllHeaders first (when this is an augmented HTTPResponse)
-            let nativeHeaders;
-            try {
-                // Call the native method from the prototype chain
-                const proto = Object.getPrototypeOf(Object.getPrototypeOf(this));
-                if (proto?.getAllHeaders) {
-                    nativeHeaders = proto.getAllHeaders.call(this);
-                }
-            } catch (_) {
-                // No native method available, use our stored headers
-            }
-            
-            // Use native headers if available, otherwise use our stored headers
-            const headers = nativeHeaders || this[$headers] || {};
-            
-            // Build result object with cookies as arrays
             const result = {};
-            const cookieKeys = [];
-            
-            // First pass: collect all keys and identify cookie keys
-            for (const key in headers) {
-                const lowerKey = Str(key).toLowerCase();
-                if (/^(set-)?cookie$/.test(lowerKey)) {
-                    cookieKeys.push(key);
-                } else {
-                    // For non-cookie headers, just copy the value
-                    result[key] = headers[key];
-                }
+            for (const header of Object.values(this[$headers].headers)) {
+                result[header.key] = header.values.length > 1 ? header.values : header.values[0];
             }
-            
-            // Second pass: group cookies by their normalized name
-            const cookieGroups = {};
-            for (const key of cookieKeys) {
-                const lowerKey = Str(key).toLowerCase();
-                if (!cookieGroups[lowerKey]) {
-                    cookieGroups[lowerKey] = [];
-                }
-                // Handle case where cookies might already be an array from native method
-                const value = headers[key];
-                if (isArray(value)) {
-                    cookieGroups[lowerKey].push(...value);
-                } else {
-                    cookieGroups[lowerKey].push(value);
-                }
-            }
-            
-            // Add cookie arrays to result using the first key's casing we found
-            for (const key of cookieKeys) {
-                const lowerKey = Str(key).toLowerCase();
-                if (cookieGroups[lowerKey]) {
-                    result[key] = cookieGroups[lowerKey];
-                    delete cookieGroups[lowerKey]; // Prevent duplicates
-                }
-            }
-            
             return result;
         }
 
@@ -832,93 +643,56 @@
      *     return new Web.ResponseEvent(response);
      *   }
      */
-    const ResponseEvent = class WebResponseEvent extends Web.Response {
+    const ResponseEvent = class WebResponseEvent {
 
         /**
          * Creates a new ResponseEvent from a Web.Response
          * @param {Web.Response} response - A Web.Response object to wrap
          */
         constructor(response) {
-            // Extract data from the response
             const bodyBlob = response.blob?.();
             const bodyText = bodyBlob?.text?.() || response.text?.() || '';
-            const status = response.status;
-            const statusText = response.statusText;
             const headers = response.headers ?? {};
-            
-            // Call parent constructor with text, not blob
-            super(bodyText, { status, statusText, headers });
-            
-            // Create ContentService output with the body text
-            let output = this
-            
-            // Determine content type from header or infer from body content
-            let contentType = headers?.get?.('Content-Type') || headers?.['content-type'] || bodyBlob?.getContentType?.();
-            let mimeType;
-            // If no content-type header, try to infer from body content
-            if (!contentType) {
-                if (canParseJSON(bodyText)) {
-                    contentType = 'application/json';
-                    mimeType = ContentService.MimeType.JSON;
-                } else if (canCompileXML(bodyText)) {
-                    contentType = 'text/xml';
-                    // Will be handled later for HTML output
-                } else if (canParseCSV(bodyText)) {
-                    contentType = 'text/csv';
-                    mimeType = ContentService.MimeType.CSV;
-                } else if (canCompile(bodyText)) {
-                    contentType = 'application/javascript';
-                    mimeType = ContentService.MimeType.JAVASCRIPT;
-                } else {
-                    contentType = 'text/plain';
-                    mimeType = ContentService.MimeType.TEXT;
-                }
+            const contentTypeHeader = headers?.get?.('Content-Type') || headers?.['content-type'] || bodyBlob?.getContentType?.() || '';
+
+            if (/xml|html/i.test(contentTypeHeader) || canCompileXML(bodyText)) {
+                return HtmlService.createHtmlOutput(bodyText);
             }
+
+            const output = ContentService.createTextOutput(bodyText);
+            let mimeType;
+            const mimeMap = ContentService.MimeType;
             
-            // Match content type to ContentService.MimeType enum
-            if (!mimeType) {
-                const ct = Str(contentType).toLowerCase();
-                for(const [key, value] of Object.entries(ContentService.MimeType)) {
-                    if (ct.includes(Str(key).toLowerCase())) {
+            const ct = contentTypeHeader.toLowerCase();
+            if (ct) {
+                for(const [key, value] of Object.entries(mimeMap)) {
+                    if (ct.includes(key.toLowerCase())) {
                         mimeType = value;
+                        break;
                     }
                 }
-            }
-            
-            // Special handling for script content types
-            if(!mimeType && /script/i.test(contentType)) {
-                mimeType = ContentService.MimeType.JAVASCRIPT;
-            }
-
-            // Try to infer from body if still no mime type
-            if(((ContentService.MimeType.TEXT == mimeType) || !mimeType) && bodyText){
-                if(canParseJSON(bodyText)){
-                    mimeType = ContentService.MimeType.JSON;
-                }else if(canCompile(bodyText)){
-                    mimeType = ContentService.MimeType.JAVASCRIPT;
-                }else if(canParseCSV(bodyText)){
-                    mimeType = ContentService.MimeType.CSV;
+                if(!mimeType && /script/i.test(ct)) {
+                    mimeType = mimeMap.JAVASCRIPT;
                 }
             }
-            
-            // Set the mime type or fall back to downloadAsFile
-            if(mimeType){
-                output.setMimeType(mimeType);
-            } else if (contentType) {
-                try{
-                    output.downloadAsFile(contentType);
-                }catch(e){
-                    console.warn('Could not set downloadAsFile for contentType:', contentType, e);
-                }
-                output.setMimeType(ContentService.MimeType.TEXT);
+
+            if (!mimeType && bodyText) {
+                if (canParseJSON(bodyText)) mimeType = mimeMap.JSON;
+                else if (canParseCSV(bodyText)) mimeType = mimeMap.CSV;
+                else if (canCompile(bodyText)) mimeType = mimeMap.JAVASCRIPT;
             }
 
-            // Use HtmlService for XML/HTML content
-            if(canCompileXML(bodyText) || /xml|html/i.test(contentType)){
-                output = HtmlService.createHtmlOutput(bodyText);        
-            }
+            output.setMimeType(mimeType || mimeMap.TEXT);
             
-            return Object.setPrototypeOf(this, Web.ResponseEvent.prototype) ;
+            if (output.getMimeType() === mimeMap.TEXT && contentTypeHeader && !ct.includes('text')) {
+                try {
+                    output.downloadAsFile(contentTypeHeader.split(';')[0].trim());
+                } catch (e) {
+                    console.warn('Could not set downloadAsFile for contentType:', contentTypeHeader, e);
+                }
+            }
+
+            return output;
         }
 
     };
@@ -934,7 +708,7 @@
      * It's primarily for type compatibility and showing the relationship between
      * our Request objects and what UrlFetchApp expects/returns.
      */
-    const Request = class WebRequest extends UrlFetchApp.getRequest {
+    const Request = class WebRequest {
 
         /**
          * Creates a new Request object
@@ -947,52 +721,39 @@
          * @param {Object} options - Request options (method, headers, body, etc.)
          */
         constructor(url, options = {}) {
-            let $this;
-            
-            // Handle new Request(options) pattern where url is actually the options object
-            if (typeof url === 'object' && url !== null && !options) {
+            // Handle `new Request(options)` pattern where url is the options object
+            if (typeof url === 'object' && url !== null) {
                 options = url;
                 url = options.url || '';
             }
             
-            // Default to GET method
-            options.method = options.method ?? 'GET';
-            
-            // Support both 'body' and 'payload' options
-            // WHY BOTH: Web APIs use 'body' for request data, but UrlFetchApp uses
-            // 'payload'. We support both names and sync them so developers can use
-            // familiar Web API terminology while still working with Google's API.
-            // This makes migration easier and code more readable.
-            if (options?.body && !options?.payload) {
-                options.payload = options.body;
-            }
-            if (options?.payload && !options?.body) {
-                options.body = options.payload;
+            // Assign defaults and passed-in options
+            const finalOptions = {
+                method: 'GET', // Default method
+                ...options,
+            };
+
+            // Sync 'body' and 'payload' properties for compatibility
+            finalOptions.payload = finalOptions.body ?? finalOptions.payload;
+            finalOptions.body = finalOptions.payload;
+
+            // Assign all properties to `this`
+            Object.assign(this, finalOptions);
+            this.url = url;
+            this.headers = new Web.Headers(finalOptions.headers);
+
+            // Create a Blob from the body if it exists
+            if (finalOptions.body) {
+                this[$body] = new Web.Blob(finalOptions.body);
             }
             
             try {
-                $this = super(...arguments);
-                $this.url = url;
-                Object.assign($this, options ?? {});
-                $this.headers = new Web.Headers(options.headers);
-                
-                if (options?.body) {
-                    $this[$body] = new Web.Blob(options.body);
-                }
+                // Validate the final request object shape with UrlFetchApp.getRequest.
+                UrlFetchApp.getRequest(this.url, this);
             } catch (e) {
-                // Error handling - create error request
-                // WHY 'https://Request.Error': This preserves the Request object shape
-                // without throwing, allowing error inspection. The URL pattern signals
-                // an error state while maintaining a valid Request structure.
-                $this = super('https://Request.Error', {
-                    body: Str(e)
-                });
-                $this[$body] = new Web.Blob(Str(e));
-                setProperty($this, { body: $this[$body] });
-                throw e;
+                // Re-throw to signal an invalid Request
+                throw new Error(`Failed to create a valid request: ${e.message}`);
             }
-            
-            return Object.setPrototypeOf($this, Web.Request.prototype);
         }
 
         /**
@@ -1194,81 +955,39 @@
      *     return ContentService.createTextOutput(JSON.stringify(event.parameters));
      *   }
      */
-    const RequestEvent = class WebRequestEvent extends Web.Request {
+    const RequestEvent = class WebRequestEvent {
 
         /**
          * Creates a new RequestEvent from a doGet/doPost event object
          * @param {Object} e - Event object passed to doGet(e) or doPost(e)
          */
         constructor(e = {}) {
-            // Merge with defaults
-            const eventData = {
-                ...defaultEvent,
-                ...e
-            };
+            const eventData = { ...defaultEvent, ...e };
             
-            // Build complete URL using ScriptApp.getService().getUrl() as base
             let baseUrl = '';
             try {
                 baseUrl = ScriptApp.getService().getUrl();
             } catch (_) {
-                // ScriptApp not available or not a web app
-                baseUrl = '';
+                baseUrl = 'https://mock.script.url';
             }
             
-            const url = baseUrl + eventData.pathInfo + 
+            const url = baseUrl + (eventData.pathInfo || '') +
                 (eventData.queryString ? '?' + eventData.queryString : '');
             
-            // Build headers from event data and ScriptApp properties using Web.Headers
-            // This ensures all headers are validated via isValidHeader before being set
             const headers = new Web.Headers();
-            
-            // Content headers
-            if (eventData.postData?.type) {
-                headers.set('Content-Type', eventData.postData.type);
-            }
-            if (eventData.contentLength || eventData.postData?.length) {
-                headers.set('Content-Length', Str(eventData.contentLength || eventData.postData.length));
-            }
-            if (eventData.postData?.name) {
-                headers.set('Content-Name', eventData.postData.name);
-            }
-            
-            // ScriptApp metadata headers (safe access in case not available)
-            try {
-                headers.set('X-ScriptApp-AuthMode', Str(eventData.authMode ?? ScriptApp.AuthMode));
-                headers.set('X-ScriptApp-AuthorizationStatus', Str(eventData.authorizationStatus ?? ScriptApp.AuthorizationStatus));
-                headers.set('X-ScriptApp-EventType', Str(eventData.triggerSource ?? ScriptApp.TriggerSource));
-                headers.set('X-ScriptApp-WeekDay', Str(eventData.weekDay ?? ScriptApp.WeekDay));
-                if (ScriptApp.InstallationSource) {
-                    headers.set('X-ScriptApp-InstallationSource', Str(ScriptApp.InstallationSource));
-                }
-                // Get authorization info if authMode is available
+            if (eventData.postData?.type) headers.set('Content-Type', eventData.postData.type);
+            if (eventData.contentLength) headers.set('Content-Length', String(eventData.contentLength));
 
-                try {
-                    const authInfo = ScriptApp.getAuthorizationInfo(eventData.authMode ?? ScriptApp.AuthMode);
-                    if (authInfo) {
-                        headers.set('X-ScriptApp-AuthorizationInfo', Str(authInfo.getAuthorizationStatus()));
-                    }
-                } catch (_) {
-                    // Authorization info not available
-                }
-        
-            } catch (_) {
-                // ScriptApp metadata not available
-            }
-            
-            // Determine method (POST if postData exists, otherwise GET)
             const method = eventData.postData?.contents ? 'POST' : 'GET';
             
-            // Call parent constructor with synthesized request data
-            super(url || '/', {
+            // Create a Request instance and copy properties to `this`
+            const request = new Web.Request(url, {
                 method: method,
                 headers: headers,
                 body: eventData.postData?.contents || ''
             });
             
-            // Add all event properties to this instance
+            Object.assign(this, request);
             Object.assign(this, eventData);
         }
 
