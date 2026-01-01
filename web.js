@@ -26,6 +26,131 @@
     globalThis.Web = globalThis.Web || class Web {};
 
     /**
+     * HTTP Status Code to Status Text mapping
+     * Comprehensive list of status codes and their text descriptions
+     * 
+     * Priority order for conflicts:
+     * 1. Official HTTP status codes (RFC 7231, etc.)
+     * 2. Unofficial/extension HTTP status codes
+     * 3. Vendor-specific codes (FTP, etc.)
+     * 
+     * When a status code appears in multiple standards, the higher priority
+     * definition is used (e.g., HTTP 500 "Internal Server Error" takes
+     * precedence over FTP 500 "Syntax error, command unrecognized")
+     */
+    const statusCodeMap = {
+        // 1xx Informational
+        100: "Continue",
+        101: "Switching Protocols",
+        102: "Processing",
+        103: "Early Hints",
+        
+        // 2xx Success
+        200: "OK",
+        201: "Created",
+        202: "Accepted",
+        203: "Non-Authoritative Information",
+        204: "No Content",
+        205: "Reset Content",
+        206: "Partial Content",
+        207: "Multi-Status",
+        208: "Already Reported",
+        226: "IM Used",
+        
+        // 3xx Redirection
+        300: "Multiple Choices",
+        301: "Moved Permanently",
+        302: "Found",
+        303: "See Other",
+        304: "Not Modified",
+        305: "Use Proxy",
+        306: "Switch Proxy",
+        307: "Temporary Redirect",
+        308: "Permanent Redirect",
+        
+        // 4xx Client Errors
+        400: "Bad Request",
+        401: "Unauthorized",
+        402: "Payment Required",
+        403: "Forbidden",
+        404: "Not Found",
+        405: "Method Not Allowed",
+        406: "Not Acceptable",
+        407: "Proxy Authentication Required",
+        408: "Request Timeout",
+        409: "Conflict",
+        410: "Gone",
+        411: "Length Required",
+        412: "Precondition Failed",
+        413: "Payload Too Large",
+        414: "URI Too Long",
+        415: "Unsupported Media Type",
+        416: "Range Not Satisfiable",
+        417: "Expectation Failed",
+        418: "I'm a teapot",
+        421: "Misdirected Request",
+        422: "Unprocessable Entity",
+        423: "Locked",
+        424: "Failed Dependency",
+        425: "Too Early",
+        426: "Upgrade Required",
+        428: "Precondition Required",
+        429: "Too Many Requests",
+        431: "Request Header Fields Too Large",
+        451: "Unavailable For Legal Reasons",
+        
+        // 5xx Server Errors
+        500: "Internal Server Error",
+        501: "Not Implemented",
+        502: "Bad Gateway",
+        503: "Service Unavailable",
+        504: "Gateway Timeout",
+        505: "HTTP Version Not Supported",
+        506: "Variant Also Negotiates",
+        507: "Insufficient Storage",
+        508: "Loop Detected",
+        510: "Not Extended",
+        511: "Network Authentication Required",
+        
+        // FTP Status Codes (non-conflicting with HTTP)
+        110: "Restart marker reply",
+        120: "Service ready in nnn minutes",
+        125: "Data connection already open; transfer starting",
+        150: "File status okay; about to open data connection",
+        211: "System status, or system help reply",
+        212: "Directory status",
+        213: "File status",
+        214: "Help message",
+        215: "NAME system type",
+        220: "Service ready for new user",
+        221: "Service closing control connection",
+        225: "Data connection open; no transfer in progress",
+        227: "Entering Passive Mode",
+        230: "User logged in, proceed",
+        250: "Requested file action okay, completed",
+        257: "PATHNAME created",
+        331: "User name okay, need password",
+        332: "Need account for login",
+        350: "Requested file action pending further information",
+        450: "Requested file action not taken",
+        452: "Requested action not taken, Insufficient storage space in system",
+        530: "Not logged in",
+        532: "Need account for storing files",
+        533: "Command protection level denied for policy reasons",
+        534: "Request denied for policy reasons",
+        535: "Failed security check",
+        536: "Data protection level not supported by security mechanism",
+        537: "Command protection level not supported by security mechanism",
+        550: "Requested action not taken, File unavailable",
+        551: "Requested action aborted, Page type unknown",
+        552: "Requested file action aborted, Exceeded storage allocation",
+        553: "Requested action not taken, File name not allowed",
+        631: "Integrity protected reply",
+        632: "Confidentiality and integrity protected reply",
+        633: "Confidentiality protected reply"
+    };
+
+    /**
      * Utility function to define immutable properties on objects
      * @param {Object} object - The object to define properties on
      * @param {Object} property - An object containing a single key-value pair to set
@@ -39,6 +164,22 @@
             configurable: false,
             writeable: false, // Typo preserved from original
             writable: false
+        });
+    };
+
+    /**
+     * Helper to define hidden (non-enumerable) properties
+     * Used for non-spec extensions and internal properties that shouldn't be enumerable
+     * @param {Object} obj - Object to define property on
+     * @param {string} prop - Property name (should include '&' prefix for hidden properties)
+     * @param {*} value - Property value
+     */
+    const setHidden = (obj, prop, value) => {
+        Object.defineProperty(obj, prop, {
+            value,
+            writable: true,
+            enumerable: false,
+            configurable: true
         });
     };
 
@@ -265,6 +406,78 @@
     };
 
     setProperty(Web, { Blob });
+
+    /**
+     * Web.File - File class implementation for Google Apps Script
+     * 
+     * Provides a File class for environments that lack it. The File class
+     * extends Blob and adds file-specific properties:
+     * - name: The file name
+     * - lastModified: Timestamp in milliseconds
+     * - lastModifiedDate: Date object (deprecated but included for compatibility)
+     * - webkitRelativePath: Empty string (for compatibility)
+     * 
+     * This allows File objects to be created and used in Google Apps Script
+     * where the native File constructor is missing.
+     */
+    const File = class WebFile extends Web.Blob {
+        
+        /**
+         * Creates a new File object
+         * @param {Array} bits - Array of data parts (strings, ArrayBuffers, Blobs, etc.)
+         * @param {string} filename - Name of the file
+         * @param {Object} options - File options (type, lastModified, etc.)
+         */
+        constructor(bits, filename, options = {}) {
+            // Extract File-specific options
+            const {
+                lastModified = Date.now(),
+                ...blobOptions
+            } = options;
+
+            // Call Blob constructor with bits and blob options
+            super(bits, blobOptions.type);
+
+            // Add File-specific properties as hidden properties
+            setHidden(this, '&name', filename);
+            setHidden(this, '&lastModified', lastModified);
+            setHidden(this, '&lastModifiedDate', new Date(lastModified));
+        }
+
+        /**
+         * Gets the file name
+         * @returns {string} File name
+         */
+        get name() {
+            return this['&name'];
+        }
+
+        /**
+         * Gets the last modified timestamp
+         * @returns {number} Last modified time in milliseconds since epoch
+         */
+        get lastModified() {
+            return this['&lastModified'];
+        }
+
+        /**
+         * Gets the last modified date
+         * @returns {Date} Last modified date (deprecated but included for compatibility)
+         */
+        get lastModifiedDate() {
+            return this['&lastModifiedDate'];
+        }
+
+        /**
+         * Gets the webkit relative path
+         * @returns {string} Always returns empty string for compatibility
+         */
+        get webkitRelativePath() {
+            return '';
+        }
+    };
+
+    setProperty(Web, { File });
 
     /**
      * Web.Headers - HTTP Headers management with Web API compatibility
@@ -499,6 +712,436 @@
 
     setProperty(Web, { Headers });
 
+    /**
+     * Web.FormData - FormData API implementation for Google Apps Script
+     * 
+     * WHY THIS EXISTS: Provides a standard Web API for constructing form data
+     * that can be sent via UrlFetchApp. Unlike browser FormData which works
+     * with File/Blob objects asynchronously, this implementation is synchronous
+     * and designed to work with Google Apps Script's Utilities.newBlob.
+     * 
+     * DESIGN PATTERNS:
+     * - Uses Symbol-based private storage ($entries) like other classes in this library
+     * - Stores entries as array of [name, value] tuples where value can be string or Web.Blob
+     * - Supports iteration (entries, keys, values, forEach, Symbol.iterator)
+     * - Provides boundary-based multipart/form-data serialization
+     * 
+     * INTEGRATION:
+     * - Works seamlessly with Web.Blob for file uploads
+     * - Can be serialized to multipart/form-data blob for use with UrlFetchApp
+     * - Supports both string values and blob/file values
+     */
+
+    // Private symbol for FormData internal storage
+    const $entries = Symbol('*entries');
+
+    const FormData = class WebFormData {
+
+        /**
+         * Creates a new FormData object
+         * 
+         * Note: Unlike browser FormData, we don't support constructing from HTML forms
+         * since Google Apps Script doesn't have DOM access
+         */
+        constructor() {
+            this[$entries] = [];
+        }
+
+        /**
+         * Appends a new value to an existing key, or adds the key if it doesn't exist
+         * 
+         * @param {string} name - Field name
+         * @param {string|Blob|Web.Blob} value - Field value (string or blob)
+         * @param {string} filename - Optional filename for blob values
+         */
+        append(name, value, filename) {
+            // Validate arguments
+            if (arguments.length < 2) {
+                throw new TypeError(`${2} argument required, but only ${arguments.length} present.`);
+            }
+
+            // Normalize the name to string
+            name = Str(name);
+
+            // Handle Blob/File values
+            if (value && (instanceOf(value,Web.Blob) || value.getBytes)) {
+                // Determine filename
+                filename = filename !== undefined
+                    ? Str(filename)
+                    : isString(value.name)
+                        ? value.name
+                        : 'blob';
+
+                // Ensure we have a Web.Blob with the correct name
+                if (!instanceOf(value,Web.Blob)) {
+                    value = new Web.Blob(value);
+                }
+
+                // Store as [name, blob, filename] tuple
+                this[$entries].push([name, value, filename]);
+            } else {
+                // Store string value as [name, stringValue] tuple
+                this[$entries].push([name, Str(value)]);
+            }
+        }
+
+        /**
+         * Deletes all values associated with a key
+         * 
+         * @param {string} name - Field name to delete
+         */
+        delete(name) {
+            if (arguments.length < 1) {
+                throw new TypeError(`${1} argument required, but only ${arguments.length} present.`);
+            }
+
+            name = Str(name);
+            this[$entries] = this[$entries].filter(entry => entry[0] !== name);
+        }
+
+        /**
+         * Returns the first value associated with a key
+         * 
+         * @param {string} name - Field name
+         * @returns {string|File|null} First value or null if not found
+         */
+        get(name) {
+            if (arguments.length < 1) {
+                throw new TypeError(`${1} argument required, but only ${arguments.length} present.`);
+            }
+
+            name = Str(name);
+            for (const entry of this[$entries]) {
+                if (entry[0] === name) {
+                    return entry[1];
+                }
+            }
+            return null;
+        }
+
+        /**
+         * Returns all values associated with a key
+         * 
+         * @param {string} name - Field name
+         * @returns {Array} Array of values
+         */
+        getAll(name) {
+            if (arguments.length < 1) {
+                throw new TypeError(`${1} argument required, but only ${arguments.length} present.`);
+            }
+
+            name = Str(name);
+            const result = [];
+            for (const entry of this[$entries]) {
+                if (entry[0] === name) {
+                    result.push(entry[1]);
+                }
+            }
+            return result;
+        }
+
+        /**
+         * Checks if a key exists
+         * 
+         * @param {string} name - Field name
+         * @returns {boolean} True if key exists
+         */
+        has(name) {
+            if (arguments.length < 1) {
+                throw new TypeError(`${1} argument required, but only ${arguments.length} present.`);
+            }
+
+            name = Str(name);
+            for (const entry of this[$entries]) {
+                if (entry[0] === name) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Sets a key to a new value, replacing all existing values
+         * 
+         * @param {string} name - Field name
+         * @param {string|Blob|Web.Blob} value - Field value
+         * @param {string} filename - Optional filename for blob values
+         */
+        set(name, value, filename) {
+            if (arguments.length < 2) {
+                throw new TypeError(`${2} argument required, but only ${arguments.length} present.`);
+            }
+
+            name = Str(name);
+
+            // Find and replace first occurrence, remove others
+            let replaced = false;
+            const result = [];
+
+            for (const entry of this[$entries]) {
+                if (entry[0] === name) {
+                    if (!replaced) {
+                        // Replace first occurrence
+                        if (value && (instanceOf(value, Web.Blob) || value.getBytes)) {
+                            filename = filename !== undefined
+                                ? Str(filename)
+                                : isString(value.name)
+                                    ? value.name
+                                    : 'blob';
+
+                            if (!instanceOf(value, Web.Blob)) {
+                                value = new Web.Blob(value);
+                            }
+
+                            result.push([name, value, filename]);
+                        } else {
+                            result.push([name, Str(value)]);
+                        }
+                        replaced = true;
+                    }
+                    // Skip other occurrences
+                } else {
+                    result.push(entry);
+                }
+            }
+
+            // If no replacement occurred, append
+            if (!replaced) {
+                if (value && (instanceOf(value, Web.Blob) || value.getBytes)) {
+                    filename = filename !== undefined
+                        ? Str(filename)
+                        : isString(value.name)
+                            ? value.name
+                            : 'blob';
+
+                    if (!instanceOf(value, Web.Blob)) {
+                        value = new Web.Blob(value);
+                    }
+
+                    result.push([name, value, filename]);
+                } else {
+                    result.push([name, Str(value)]);
+                }
+            }
+
+            this[$entries] = result;
+        }
+
+        /**
+         * Returns an iterator over all entries as [name, value] pairs
+         * 
+         * @returns {Iterator} Iterator of [name, value] pairs
+         */
+        * entries() {
+            for (const entry of this[$entries]) {
+                // Return as [name, value] (filename is internal)
+                yield [entry[0], entry[1]];
+            }
+        }
+
+        /**
+         * Returns an iterator over all keys
+         * 
+         * @returns {Iterator} Iterator of keys
+         */
+        * keys() {
+            for (const entry of this[$entries]) {
+                yield entry[0];
+            }
+        }
+
+        /**
+         * Returns an iterator over all values
+         * 
+         * @returns {Iterator} Iterator of values
+         */
+        * values() {
+            for (const entry of this[$entries]) {
+                yield entry[1];
+            }
+        }
+
+        /**
+         * Executes a callback for each entry
+         * 
+         * @param {Function} callback - Function to execute for each entry
+         * @param {*} thisArg - Value to use as 'this' when executing callback
+         */
+        forEach(callback, thisArg) {
+            if (arguments.length < 1) {
+                throw new TypeError(`${1} argument required, but only ${arguments.length} present.`);
+            }
+
+            for (const [name, value] of this.entries()) {
+                callback.call(thisArg, value, name, this);
+            }
+        }
+
+        /**
+         * Makes FormData iterable (for...of loops)
+         * Alias for entries()
+         * 
+         * @returns {Iterator} Iterator of [name, value] pairs
+         */
+        [Symbol.iterator]() {
+            return this.entries();
+        }
+
+        /**
+         * Returns string tag for Object.prototype.toString
+         * 
+         * @returns {string} 'FormData'
+         */
+        toString() {
+            return '[object FormData]';
+        }
+
+    };
+
+    /**
+     * Non-spec extension: toBlob() method for serializing FormData
+     * 
+     * This is a non-standard extension (not part of the FormData spec).
+     * It's stored as a hidden property (&toBlob) following the pattern from
+     * web-streams-shim for non-spec methods.
+     * 
+     * WHY THIS METHOD: UrlFetchApp.fetch() needs the body as a Blob with
+     * proper multipart/form-data encoding. This method converts the stored
+     * entries into the standard multipart format with boundaries.
+     * 
+     * @returns {Web.Blob} Blob containing multipart/form-data
+     */
+    setHidden(FormData.prototype, '&toBlob', function toBlob() {
+        // Generate random boundary
+        const boundary = '----formdata-polyfill-' + Math.random();
+        const chunks = [];
+            const prefix = `--${boundary}\r\nContent-Disposition: form-data; name="`;
+
+            // Helper to escape special characters in names/filenames
+            const escape = (str, isFilename) => {
+                // Normalize line feeds in content (not filenames)
+                if (!isFilename) {
+                    str = str.replace(/\r?\n|\r/g, '\r\n');
+                }
+                // Escape special characters for header values
+                return str
+                    .replace(/\n/g, '%0A')
+                    .replace(/\r/g, '%0D')
+                    .replace(/"/g, '%22');
+            };
+
+            // Build multipart body
+            for (const entry of this[$entries]) {
+                const name = entry[0];
+                const value = entry[1];
+                const filename = entry[2];
+
+                if (isString(value)) {
+                    // String field
+                    chunks.push(prefix + escape(name) + `"\r\n\r\n${value.replace(/\r(?!\n)|(?<!\r)\n/g, '\r\n')}\r\n`);
+                } else {
+                    // Blob/File field
+                    chunks.push(
+                        prefix + escape(name) + `"; filename="${escape(filename, true)}"\r\n` +
+                        `Content-Type: ${value.type || 'application/octet-stream'}\r\n\r\n`,
+                        value,
+                        '\r\n'
+                    );
+                }
+            }
+
+            // Add closing boundary
+            chunks.push(`--${boundary}--`);
+
+            // Create blob with proper content type
+            return new Web.Blob(chunks, `multipart/form-data; boundary=${boundary}`);
+    });
+
+
+    /**
+     * Non-spec extension: fromBlob() static method for parsing multipart FormData
+     * 
+     * This is a non-standard extension (not part of the FormData spec).
+     * It's stored as a hidden property (&fromBlob) following the pattern from
+     * web-streams-shim for non-spec methods.
+     * 
+     * WHY THIS METHOD: Allows parsing of multipart/form-data blobs back into
+     * FormData instances, useful for proxying, caching, or processing form
+     * submissions that arrive as blobs.
+     * 
+     * @param {Web.Blob|Blob} blob - Blob containing multipart/form-data
+     * @returns {Web.FormData} Parsed FormData instance
+     */
+    setHidden(FormData, '&fromBlob', function fromBlob(blob) {
+        const formData = new FormData();
+            
+            // Get text content from blob
+            const text = blob.text ? blob.text() : blob.getDataAsString();
+            
+            // Extract boundary from content type
+            const contentType = blob.type || blob.getContentType?.() || '';
+            const boundaryMatch = contentType.match(/boundary=([^;]+)/);
+            if (!boundaryMatch) {
+                throw new Error('Invalid multipart/form-data: no boundary found');
+            }
+            
+            const boundary = boundaryMatch[1].trim();
+            const parts = text.split(`--${boundary}`);
+            
+            // Helper to unescape special characters
+            const unescape = (str) => {
+                return str
+                    .replace(/%22/g, '"')
+                    .replace(/%0D/g, '\r')
+                    .replace(/%0A/g, '\n');
+            };
+            
+            // Process each part (skip first empty and last closing)
+            const partsLength_1 = parts.length - 1;
+            for (let i = 1; i !== partsLength_1; ++i) {
+                const part = parts[i];
+                if (!part.trim()) continue;
+                
+                // Split headers from body at \r\n\r\n
+                const headerBodySplit = part.indexOf('\r\n\r\n');
+                if (headerBodySplit === -1) continue;
+                
+                const headerSection = part.substring(0, headerBodySplit);
+                let body = part.substring(headerBodySplit + 4);
+                
+                // Remove trailing \r\n
+                if (body.endsWith('\r\n')) {
+                    body = body.substring(0, body.length - 2);
+                }
+                
+                // Parse Content-Disposition header
+                const dispositionMatch = headerSection.match(/Content-Disposition: form-data; name="([^"]+)"(?:; filename="([^"]+)")?/);
+                if (!dispositionMatch) continue;
+                
+                const name = unescape(dispositionMatch[1]);
+                const filename = dispositionMatch[2] ? unescape(dispositionMatch[2]) : null;
+                
+                if (filename) {
+                    // This is a file field
+                    // Parse Content-Type if present
+                    const contentTypeMatch = headerSection.match(/Content-Type: ([^\r\n]+)/);
+                    const fileType = contentTypeMatch ? contentTypeMatch[1].trim() : 'application/octet-stream';
+                    
+                    // Create blob from body
+                    const fileBlob = new Web.Blob([body], fileType);
+                    formData.append(name, fileBlob, filename);
+                } else {
+                    // This is a text field
+                    formData.append(name, body);
+                }
+            }
+            
+            return formData;
+    });
+
+
+    setProperty(Web, { FormData });
+
     // Private symbols for Response internal state
     // WHY SYMBOLS: We use symbols to hide internal state from enumeration and
     // prevent conflicts with properties that UrlFetchApp's response objects might have.
@@ -520,11 +1163,13 @@
          * @param {Object} options - Response options (status, statusText, headers)
          */
         constructor(body, options = {}) {;
-            super(body);
+            super(body ? new Web.Blob(body).text() : null);
             Object.assign(this, options);
             this[$headers] = new Web.Headers(this.headers);
+            this.headers = this.headers ?? this[$headers];
+            Object.setPrototypeOf(this.headers, Web.Headers.prototype) ;
             this[$status] = options.status ?? 200;
-            this[$statusText] = options.statusText ?? 'OK';
+            this[$statusText] = this[$status] == 200 ? options.statusText ?? 'OK' : statusCodeMap[this[$status]];
             
             // Handle body with error catching
             if (body) {
@@ -697,6 +1342,15 @@
         }
 
         /**
+         * Parses response as FormData (from multipart/form-data)
+         * @returns {Web.FormData} Parsed FormData object
+         */
+        formData() {
+            const blob = this.blob();
+            return FormData['&fromBlob'](blob);
+        }
+
+        /**
          * Gets HTTP response code
          * @returns {number} Status code
          */
@@ -721,10 +1375,7 @@
          * @returns {string} Status text
          */
         get statusText() {
-            if (this.status == 200) {
-                return 'OK';
-            }
-            return this[$statusText] || Str(this.status);
+            return this[$statusText] || statusCodeMap[this.status] || Str(this.status);
         }
 
         set statusText(value) {
@@ -791,7 +1442,7 @@
         }
     };
 
-    const canCompileXML = x =>{
+    const canParseXML = x =>{
         try {
             XmlService.parse(x);
             return true;
@@ -855,49 +1506,42 @@
             // Determine content type from header or infer from body content
             let contentType = headers?.get?.('Content-Type') || headers?.['content-type'] || bodyBlob?.getContentType?.();
             let mimeType;
-            // If no content-type header, try to infer from body content
-            if (!contentType) {
-                if (canParseJSON(bodyText)) {
-                    contentType = 'application/json';
-                    mimeType = ContentService.MimeType.JSON;
-                } else if (canCompileXML(bodyText)) {
-                    contentType = 'text/xml';
-                    // Will be handled later for HTML output
-                } else if (canParseCSV(bodyText)) {
-                    contentType = 'text/csv';
-                    mimeType = ContentService.MimeType.CSV;
-                } else if (canCompile(bodyText)) {
-                    contentType = 'application/javascript';
+            
+            // Match content type string to ContentService.MimeType enum
+            if (contentType) {
+                const ct = Str(contentType).toLowerCase();
+                // Check for script content types
+                if (/script/i.test(ct)) {
                     mimeType = ContentService.MimeType.JAVASCRIPT;
                 } else {
-                    contentType = 'text/plain';
-                    mimeType = ContentService.MimeType.TEXT;
-                }
-            }
-            
-            // Match content type to ContentService.MimeType enum
-            if (!mimeType) {
-                const ct = Str(contentType).toLowerCase();
-                for(const [key, value] of Object.entries(ContentService.MimeType)) {
-                    if (ct.includes(Str(key).toLowerCase())) {
-                        mimeType = value;
+                    // Try to match against ContentService.MimeType keys
+                    for(const [key, value] of Object.entries(ContentService.MimeType)) {
+                        if (ct.includes(Str(key).toLowerCase())) {
+                            mimeType = value;
+                            break;
+                        }
                     }
                 }
             }
             
-            // Special handling for script content types
-            if(!mimeType && /script/i.test(contentType)) {
-                mimeType = ContentService.MimeType.JAVASCRIPT;
-            }
-
-            // Try to infer from body if still no mime type
-            if(((ContentService.MimeType.TEXT == mimeType) || !mimeType) && bodyText){
-                if(canParseJSON(bodyText)){
+            // If no content type or couldn't map to mimeType, infer from body content
+            // Order matters: JSON before JS (avoid false positives), CSV last (lenient parser)
+            if (!mimeType && bodyText) {
+                if (canParseJSON(bodyText)) {
+                    contentType = contentType || 'application/json';
                     mimeType = ContentService.MimeType.JSON;
-                }else if(canCompile(bodyText)){
+                } else if (canParseXML(bodyText)) {
+                    contentType = contentType || 'text/xml';
+                    // MimeType will be set below or handled by HtmlService
+                } else if (canCompile(bodyText)) {
+                    contentType = contentType || 'application/javascript';
                     mimeType = ContentService.MimeType.JAVASCRIPT;
-                }else if(canParseCSV(bodyText)){
+                } else if (canParseCSV(bodyText)) {
+                    contentType = contentType || 'text/csv';
                     mimeType = ContentService.MimeType.CSV;
+                } else {
+                    contentType = contentType || 'text/plain';
+                    mimeType = ContentService.MimeType.TEXT;
                 }
             }
             
@@ -914,7 +1558,7 @@
             }
 
             // Use HtmlService for XML/HTML content
-            if(canCompileXML(bodyText) || /xml|html/i.test(contentType)){
+            if(canParseXML(bodyText) || /xml|html/i.test(contentType)){
                 output = HtmlService.createHtmlOutput(bodyText);        
             }
             
@@ -1016,7 +1660,16 @@
          * @returns {Object} Parsed JSON
          */
         json() {
-            return JSON.parse(this.getContentText());
+            return JSON.parse(this.text());
+        }
+
+        /**
+         * Parses request body as FormData (from multipart/form-data)
+         * @returns {Web.FormData} Parsed FormData object
+         */
+        formData() {
+            const blob = this.blob();
+            return FormData['&fromBlob'](blob);
         }
 
         /**
@@ -1093,6 +1746,7 @@
         validateHttpsCertificates: false,
         muteHttpExceptions: true,
         escaping: false,
+        method: 'GET'
     };
 
     /**
@@ -1121,23 +1775,44 @@
         try {
             // Perform the fetch using Google's UrlFetchApp
             const response = UrlFetchApp.fetch(Str(url), requestOptions);
-            const status = response.getResponseCode();
             
             // Check for error status codes if exceptions are not muted
-            if (requestOptions.muteHttpExceptions == false && (status >= 400 || status <= 0 || !status)) {
+            const status = response.getResponseCode();
+            if (requestOptions.muteHttpExceptions === false && (status >= 400 || status <= 0 || !status)) {
                 throw new Error(`Fetch error ${Str(status)}`);
             }
             
-            // Return response with Web.Response prototype
+            // Augment response with Web.Response prototype
             // WHY SETPROTOTYPEOF: UrlFetchApp.fetch() returns a Google HTTPResponse
             // object. Rather than wrapping it, we augment it by changing its prototype
             // to Web.Response. This gives it all our Web API methods (.json(), .text(),
             // etc.) while preserving its internal Google properties. It's both a valid
             // HTTPResponse AND a valid Web.Response.
+            
+            // Initialize private symbols for augmented responses
+            response[$status] = status;
+            response[$statusText] = statusCodeMap[status];
+            
+            // Set up headers
+            response[$headers] = new Web.Headers(response.getAllHeaders());
+            if(!response.headers){
+                response.headers = response[$headers];
+            }
+            Object.setPrototypeOf(response.headers, Web.Headers.prototype);
+            
+            // Set up body from response content
+            try {
+                response[$body] = new Web.Blob(response.getContentText(), response.headers.get('content-type'));
+            } catch (e) {
+                // If getting content fails, create empty blob
+                response[$body] = new Web.Blob('');
+            }
+            
             return Object.setPrototypeOf(response, Web.Response.prototype);
         } catch (e) {
+            console.warn('Fetch error:', e);
             // Handle errors
-            if (requestOptions.muteHttpExceptions == false) {
+            if (requestOptions.muteHttpExceptions === false) {
                 throw e;
             }
             
@@ -1410,5 +2085,83 @@
     };
 
     setProperty(Web, { do: WebDo });
+
+    /**
+     * Event listener storage
+     * Stores event handlers for different event types
+     */
+    const eventListeners = new Map();
+
+    /**
+     * Web.addEventListener - Adds an event listener to the Web object
+     * 
+     * WHY THIS EXISTS: Provides a familiar browser-like API for setting up handlers.
+     * When 'fetch' event listener is added, it automatically configures globalThis.doGet
+     * and globalThis.doPost to use Web.do() with the provided handler function.
+     * 
+     * This makes Google Apps Script web apps feel like Service Workers with a
+     * standard addEventListener('fetch', handler) pattern.
+     * 
+     * Example usage:
+     *   Web.addEventListener('fetch', (request) => {
+     *     const data = request.json();
+     *     return new Web.Response(JSON.stringify({ received: data }), {
+     *       headers: { 'Content-Type': 'application/json' }
+     *     });
+     *   });
+     * 
+     * @param {string} type - Event type (e.g., 'fetch')
+     * @param {Function} handler - Handler function
+     */
+    const addEventListener = function WebAddEventListener(type, handler) {
+        if (!type || typeof handler !== 'function') {
+            throw new Error('addEventListener requires an event type and handler function');
+        }
+
+        // Store the handler
+        if (!eventListeners.has(type)) {
+            eventListeners.set(type, []);
+        }
+        eventListeners.get(type).push(handler);
+
+        // Special handling for 'fetch' events - set up global doGet/doPost
+        if (type === 'fetch') {
+            globalThis.doGet = (e) => {
+                return Web.do(e, handler);
+            };
+
+            globalThis.doPost = (e) => {
+                return Web.do(e, handler);
+            };
+        }
+    };
+
+    setProperty(Web, { addEventListener });
+
+    /**
+     * Web.removeEventListener - Removes an event listener from the Web object
+     * 
+     * @param {string} type - Event type (e.g., 'fetch')
+     * @param {Function} handler - Handler function to remove
+     */
+    const removeEventListener = function WebRemoveEventListener(type, handler) {
+        if (!eventListeners.has(type)) {
+            return;
+        }
+
+        const handlers = eventListeners.get(type);
+        const index = handlers.indexOf(handler);
+        if (index !== -1) {
+            handlers.splice(index, 1);
+        }
+
+        // If this was the last fetch handler, clear global doGet/doPost
+        if (type === 'fetch' && handlers.length === 0) {
+            delete globalThis.doGet;
+            delete globalThis.doPost;
+        }
+    };
+
+    setProperty(Web, { removeEventListener });
 
 })();

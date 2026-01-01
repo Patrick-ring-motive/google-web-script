@@ -18,6 +18,7 @@ A comprehensive Web API polyfill library for Google Apps Script that brings fami
 - **Web.fetch()** - Fetch API implementation using UrlFetchApp
 - **Web.Blob** - Web Blob API compatible with Google Apps Script
 - **Web.Headers** - HTTP Headers management with case-insensitive handling and validation
+- **Web.FormData** - FormData API for constructing multipart/form-data requests
 - **Web.Request** - Request objects with standard Web API interface and flexible constructors
 - **Web.Response** - Response objects with methods like `.json()`, `.text()`, `.blob()`, `.clone()`
 - **Web.RequestEvent** - Wraps doGet/doPost events with Web API methods
@@ -175,6 +176,36 @@ const buffer = blob.arrayBuffer();
 const sliced = blob.slice(0, 5);
 ```
 
+### FormData for File Uploads and Forms
+
+```javascript
+// Create FormData and add fields
+const formData = new Web.FormData();
+formData.append('username', 'john_doe');
+formData.append('email', 'john@example.com');
+
+// Add file/blob data
+const fileBlob = new Web.Blob(['file content'], 'text/plain');
+formData.append('file', fileBlob, 'document.txt');
+
+// Send as multipart/form-data
+const response = Web.fetch('https://api.example.com/upload', {
+  method: 'POST',
+  body: formData.toBlob()
+});
+
+// Iterate over entries
+for (const [name, value] of formData) {
+  Logger.log(`${name}: ${value}`);
+}
+
+// FormData methods: get, getAll, set, delete, has
+Logger.log(formData.get('username')); // 'john_doe'
+formData.set('username', 'jane_doe');  // Replace value
+formData.delete('email');              // Remove field
+Logger.log(formData.has('email'));     // false
+```
+
 ## API Reference
 
 ### Web.fetch(url, options)
@@ -317,6 +348,42 @@ Blob implementation compatible with Google Apps Script.
 - `bytes()` - Returns content as Uint8Array
 - `arrayBuffer()` - Returns content as ArrayBuffer
 - `slice(start, end)` - Creates a new Blob from a portion
+
+### Web.FormData
+
+FormData implementation for constructing form data sets (key/value pairs) for submission.
+
+**Constructor:**
+```javascript
+const formData = new Web.FormData();
+```
+
+**Methods:**
+- `append(name, value)` - Appends a new value (string)
+- `append(name, blob, filename)` - Appends a file/blob value
+- `set(name, value)` - Sets a value, replacing all existing values with same name
+- `set(name, blob, filename)` - Sets a file/blob value
+- `get(name)` - Returns first value associated with name, or null
+- `getAll(name)` - Returns all values associated with name as array
+- `has(name)` - Returns boolean indicating if name exists
+- `delete(name)` - Deletes all values associated with name
+- `entries()` - Returns iterator of [name, value] pairs
+- `keys()` - Returns iterator of names
+- `values()` - Returns iterator of values
+- `forEach(callback, thisArg)` - Executes callback for each entry
+- `toBlob()` - Serializes to multipart/form-data Blob for UrlFetchApp
+
+**Usage with fetch:**
+```javascript
+const formData = new Web.FormData();
+formData.append('field1', 'value1');
+formData.append('file', new Web.Blob(['content'], 'text/plain'), 'file.txt');
+
+Web.fetch('https://api.example.com/upload', {
+  method: 'POST',
+  body: formData.toBlob()  // Convert to multipart/form-data Blob
+});
+```
 
 ## Implementation Details
 
