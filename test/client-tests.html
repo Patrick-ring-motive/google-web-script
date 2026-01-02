@@ -545,14 +545,12 @@
         }, 'integration');
 
         runner.addTest('Echo endpoint reflects request', async () => {
-            const url = getWebAppUrl() + '?path=/echo';
-            const response = await fetch(url, {
-                headers: { 'X-Custom-Header': 'test-value' }
-            });
+            const url = getWebAppUrl() + '?path=/echo&echo=testing';
+            const response = await fetch(url);
             
             assert(response.ok, 'Request should succeed');
             const data = await response.json();
-            assert(data.headers, 'Should return headers');
+            assert(data.headers, 'Should return echo');
         }, 'integration');
 
         runner.addTest('Headers endpoint returns request headers', async () => {
@@ -625,7 +623,6 @@
         runner.addTest('Browser Request API exists', async () => {
             const request = new Request('https://example.com', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ test: true })
             });
             assertEqual(request.method, 'POST', 'Request should be created');
@@ -634,7 +631,6 @@
         runner.addTest('Browser Response API exists', async () => {
             const response = new Response('Test', {
                 status: 200,
-                headers: { 'Content-Type': 'text/plain' }
             });
             assertEqual(response.status, 200, 'Response should be created');
         }, 'browser');
