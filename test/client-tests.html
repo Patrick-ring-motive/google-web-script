@@ -525,7 +525,7 @@
         }, 'integration');
 
         runner.addTest('POST request with JSON body', async () => {
-            const url = getWebAppUrl() + '?path=/post';
+            const url = getWebAppUrl();
             const testData = { message: 'Hello from client', timestamp: Date.now() };
             
             const response = await fetch(url, {
@@ -593,7 +593,7 @@
         }, 'integration');
 
         runner.addTest('Large JSON payload', async () => {
-            const url = getWebAppUrl() + '?path=/post';
+            const url = getWebAppUrl();
             const largeData = {
                 items: Array.from({ length: 100 }, (_, i) => ({
                     id: i,
