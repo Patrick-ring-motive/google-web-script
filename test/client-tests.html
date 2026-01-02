@@ -525,12 +525,11 @@
         }, 'integration');
 
         runner.addTest('POST request with JSON body', async () => {
-            const url = getWebAppUrl();
+            const url = getWebAppUrl() + '?path=/post';
             const testData = { message: 'Hello from client', timestamp: Date.now() };
             
             const response = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(testData)
             });
             
@@ -593,7 +592,7 @@
         }, 'integration');
 
         runner.addTest('Large JSON payload', async () => {
-            const url = getWebAppUrl();
+            const url = getWebAppUrl() + '?path=/post';
             const largeData = {
                 items: Array.from({ length: 100 }, (_, i) => ({
                     id: i,
