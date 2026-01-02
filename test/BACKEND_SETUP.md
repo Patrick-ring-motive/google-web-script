@@ -129,6 +129,12 @@ The backend includes CORS headers by default. If you still see CORS errors:
 - Verify web.js is loaded before backend.js
 - Make sure `Web.addEventListener` is being called
 
+### POST Requests Not Working
+- Don't define explicit `doGet()` or `doPost()` functions in backend.js after `Web.addEventListener('fetch', ...)`
+- The addEventListener call automatically creates these functions on globalThis
+- If you define them explicitly after addEventListener, they override the event listener
+- The backend.js file has been updated to remove explicit function declarations
+
 ## Updating the Backend
 
 When you make changes:

@@ -201,41 +201,10 @@ Web.addEventListener('fetch', (request) => {
   }
 });
 
-/**
- * doGet function - required by Google Apps Script for web apps
- * Automatically configured by Web.addEventListener('fetch', ...)
- * 
- * This will be automatically created, but we can define it explicitly
- * to make it clear in the script editor.
- * 
- * Note: Web.addEventListener('fetch', ...) automatically sets up
- * globalThis.doGet and globalThis.doPost, so these explicit
- * definitions may be overridden. They're included here for clarity.
- */
-function doGet(e) {
-  // The addEventListener('fetch', ...) call above already configures doGet
-  // This is just a fallback in case it's called before addEventListener runs
-  if (typeof Web !== 'undefined' && Web.do) {
-    return Web.do(e);
-  }
-  return ContentService.createTextOutput(JSON.stringify({
-    error: 'Web object not initialized'
-  })).setMimeType(ContentService.MimeType.JSON);
-}
-
-/**
- * doPost function - required by Google Apps Script for web apps
- * Automatically configured by Web.addEventListener('fetch', ...)
- */
-function doPost(e) {
-  // The addEventListener('fetch', ...) call above already configures doPost
-  if (typeof Web !== 'undefined' && Web.do) {
-    return Web.do(e);
-  }
-  return ContentService.createTextOutput(JSON.stringify({
-    error: 'Web object not initialized'
-  })).setMimeType(ContentService.MimeType.JSON);
-}
+// Note: Web.addEventListener('fetch', ...) automatically creates globalThis.doGet
+// and globalThis.doPost, so we don't need to define them explicitly here.
+// If you want explicit functions for clarity in the Apps Script editor, they
+// should be defined BEFORE calling Web.addEventListener, not after.
 
 /**
  * Test function to verify setup

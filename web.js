@@ -2126,11 +2126,11 @@
 
         // Special handling for 'fetch' events - set up global doGet/doPost
         if (type === 'fetch') {
-            globalThis.doGet = (e) => {
+            globalThis.doGet = function doGet(e) {
                 return Web.do(e, handler);
             };
 
-            globalThis.doPost = (e) => {
+            globalThis.doPost = function doPost(e) {
                 return Web.do(e, handler);
             };
         }
