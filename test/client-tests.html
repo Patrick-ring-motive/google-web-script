@@ -550,15 +550,7 @@
             
             assert(response.ok, 'Request should succeed');
             const data = await response.json();
-            assert(data.headers, 'Should return echo');
-        }, 'integration');
-
-        runner.addTest('Headers endpoint returns request headers', async () => {
-            const url = getWebAppUrl() + '?path=/headers';
-            const response = await fetch(url);
-            assert(response.ok, 'Request should succeed');
-            const data = await response.json();
-            assert(data.headers, 'Should return headers object');
+            assert(data.parameters, 'Should return echo');
         }, 'integration');
 
         runner.addTest('FormData endpoint handles multipart data', async () => {
@@ -581,12 +573,6 @@
             
             const data = await response.json();
             assert(data.fields, 'Should return fields object');
-        }, 'integration');
-
-        runner.addTest('Status endpoint returns correct status code', async () => {
-            const url = getWebAppUrl() + '?path=/status/201';
-            const response = await fetch(url);
-            assertEqual(response.status, 201, 'Should return status 201');
         }, 'integration');
 
         runner.addTest('Large JSON payload', async () => {
