@@ -408,6 +408,38 @@ ResponseEvent automatically detects content types:
    - Valid JavaScript → `application/javascript`
    - Default → `text/plain`
 
+## Testing
+
+This library includes comprehensive tests for both server-side and client-side usage.
+
+### Server Tests (Google Apps Script)
+Run tests directly in the Apps Script environment:
+```javascript
+runAllTests();      // Full test suite including network requests
+runQuickTests();    // Fast tests without network requests
+```
+
+See [`test/server-tests.js`](test/server-tests.js) for the complete test suite.
+
+### Client Tests (Browser)
+Test the deployed web app from a browser using `test/client-tests.html`.
+
+**Setup Required:**
+1. Deploy the backend: Copy `web.js` and `test/backend.js` to Google Apps Script
+2. Deploy as Web App (Execute as: Me, Access: Anyone)
+3. Open `client-tests.html` and enter your deployment URL
+
+📖 **Full deployment instructions:** [`test/BACKEND_SETUP.md`](test/BACKEND_SETUP.md)  
+📋 **Quick start guide:** [`test/TESTING.md`](test/TESTING.md)
+
+The test/backend.js file provides test endpoints including:
+- `/echo` - Echo request details
+- `/json` - JSON responses
+- `/post` - POST handling
+- `/formdata` - FormData parsing with Web.FormData.formData()
+- `/headers` - Header inspection
+- `/status/{code}` - Status code testing
+
 ## Use Cases
 
 - Making HTTP requests from Google Sheets, Docs, or Forms

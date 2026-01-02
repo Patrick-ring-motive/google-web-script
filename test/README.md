@@ -33,21 +33,36 @@ Tests that run entirely within Google Apps Script environment.
 ### 2. `client-tests.html` - Client-Side Integration Tests
 HTML page that tests the deployed web app from the browser.
 
-**How to use:**
-1. Deploy your Google Apps Script as a web app:
+**Prerequisites:**
+You need to deploy a Google Apps Script web app backend first!
+
+👉 **See [BACKEND_SETUP.md](BACKEND_SETUP.md) for complete deployment instructions**
+
+**Quick Setup:**
+1. Deploy your Google Apps Script with `web.js` and `test/backend.js`:
    - In Apps Script editor: Deploy > New deployment
    - Type: Web app
    - Execute as: Me
    - Who has access: Anyone
    - Copy the deployment URL
 
-2. Set up a simple fetch handler in your Apps Script:
-   ```javascript
-   Web.addEventListener('fetch', (request) => {
-     return new Web.Response(JSON.stringify({
-       method: request.method,
-       url: request.url,
-       headers: Object.fromEntries(request.headers.entries()),
+2. Open `client-tests.html` in your browser
+
+3. Paste the deployment URL into the "API Endpoint" field
+
+4. Click "Run All Tests"
+
+**What it tests:**
+- ✅ HTTP GET/POST requests
+- ✅ Request/Response headers
+- ✅ JSON parsing
+- ✅ FormData submissions
+- ✅ File uploads
+- ✅ Error handling
+- ✅ CORS handling
+- ✅ Status codes
+
+**Note:** The `backend.js` file (in this directory) provides all the endpoints needed for client tests.
        body: request.text()
      }), {
        status: 200,
