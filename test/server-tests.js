@@ -922,6 +922,47 @@ function testFormData() {
     TestRunner.assertEqual(parsed.get('file3').type, 'application/json', 'File3 type should match');
   });
 
+  TestRunner.test('Web.FormData - toBits() converts FormData to byte array', () => {
+    const fd = new Web.FormData();
+    fd.append('name', 'John Doe');
+    fd.append('email', 'john@example.com');
+    
+    // toBits is an internal function, so we test it through Blob constructor
+    // Create a blob with FormData as the body
+    const blob = new Web.Blob([fd]);
+    
+    TestRunner.assert(blob !== null, 'Blob should be created from FormData');
+    TestRunner.assert(blob.getBytes, 'Blob should have getBytes method');
+    TestRunner.assert(blob.type.includes('multipart/form-data'), 'Blob type should be multipart/form-data');
+    TestRunner.assert(blob.type.includes('boundary='), 'Blob type should include boundary');
+    
+    const text = blob.text();
+    TestRunner.assert(text.includes('name="name"'), 'Blob content should contain name field');
+    TestRunner.assert(text.includes('John Doe'), 'Blob content should contain name value');
+    TestRunner.assert(text.includes('name="email"'), 'Blob content should contain email field');
+    TestRunner.assert(text.includes('john@example.com'), 'Blob content should contain email value');
+    
+    const bytes = blob.getBytes();
+    TestRunner.assert(Array.isArray(bytes) || bytes.length !== undefined, 'Should return byte array');
+    TestRunner.assert(bytes.length > 0, 'Byte array should not be empty');
+  });
+
+  TestRunner.test('Web.FormData - toBits() handles FormData with file attachments', () => {
+    const fd = new Web.FormData();
+    fd.append('message', 'Test message');
+    const fileBlob = new Web.Blob(['file data'], 'text/plain');
+    fd.append('attachment', fileBlob, 'document.txt');
+    
+    const blob = new Web.Blob([fd]);
+    const text = blob.text();
+    
+    TestRunner.assert(text.includes('name="message"'), 'Should contain message field');
+    TestRunner.assert(text.includes('Test message'), 'Should contain message value');
+    TestRunner.assert(text.includes('name="attachment"'), 'Should contain attachment field');
+    TestRunner.assert(text.includes('filename="document.txt"'), 'Should contain filename');
+    TestRunner.assert(text.includes('file data'), 'Should contain file data');
+  });
+
   TestRunner.test('Web.FormData - fromBlob() round-trip preserves data', () => {
     const fd = new Web.FormData();
     fd.append('text1', 'Hello');
@@ -1034,6 +1075,906 @@ function testFormData() {
 }
 
 /**
+ * Test URLSearchParams functionality
+ */
+function testURLSearchParams() {
+  TestRunner.test('Web.URLSearchParams - Create empty URLSearchParams', () => {
+    const params = new Web.URLSearchParams();
+    TestRunner.assertEqual(params.size, 0, 'Empty params should have size 0');
+    TestRunner.assertEqual(params.toString(), '', 'Empty params toString should be empty string');
+  });
+
+  TestRunner.test('Web.URLSearchParams - Create from string', () => {
+    const params = new Web.URLSearchParams('foo=bar&baz=qux');
+    TestRunner.assertEqual(params.get('foo'), 'bar', 'Should parse foo=bar');
+    TestRunner.assertEqual(params.get('baz'), 'qux', 'Should parse baz=qux');
+    TestRunner.assertEqual(params.size, 2, 'Should have 2 parameters');
+  });
+
+  TestRunner.test('Web.URLSearchParams - Create from string with ? prefix', () => {
+    const params = new Web.URLSearchParams('?name=John&age=30');
+    TestRunner.assertEqual(params.get('name'), 'John', 'Should parse name');
+    TestRunner.assertEqual(params.get('age'), '30', 'Should parse age');
+  });
+
+  TestRunner.test('Web.URLSearchParams - Create from object', () => {
+    const params = new Web.URLSearchParams({ user: 'alice', role: 'admin' });
+    TestRunner.assertEqual(params.get('user'), 'alice', 'Should have user');
+    TestRunner.assertEqual(params.get('role'), 'admin', 'Should have role');
+  });
+
+  TestRunner.test('Web.URLSearchParams - Create from array of pairs', () => {
+    const params = new Web.URLSearchParams([['key1', 'value1'], ['key2', 'value2']]);
+    TestRunner.assertEqual(params.get('key1'), 'value1', 'Should have key1');
+    TestRunner.assertEqual(params.get('key2'), 'value2', 'Should have key2');
+  });
+
+  TestRunner.test('Web.URLSearchParams - Create from another URLSearchParams', () => {
+    const original = new Web.URLSearchParams('a=1&b=2');
+    const copy = new Web.URLSearchParams(original);
+    TestRunner.assertEqual(copy.get('a'), '1', 'Should copy a');
+    TestRunner.assertEqual(copy.get('b'), '2', 'Should copy b');
+  });
+
+  TestRunner.test('Web.URLSearchParams - append() adds values', () => {
+    const params = new Web.URLSearchParams();
+    params.append('tag', 'javascript');
+    params.append('tag', 'web');
+    TestRunner.assertEqual(params.getAll('tag').length, 2, 'Should have 2 tag values');
+    TestRunner.assertEqual(params.getAll('tag')[0], 'javascript', 'First tag should be javascript');
+    TestRunner.assertEqual(params.getAll('tag')[1], 'web', 'Second tag should be web');
+  });
+
+  TestRunner.test('Web.URLSearchParams - set() replaces values', () => {
+    const params = new Web.URLSearchParams();
+    params.append('name', 'John');
+    params.append('name', 'Jane');
+    params.set('name', 'Bob');
+    TestRunner.assertEqual(params.getAll('name').length, 1, 'Should have 1 name value after set');
+    TestRunner.assertEqual(params.get('name'), 'Bob', 'Name should be Bob');
+  });
+
+  TestRunner.test('Web.URLSearchParams - delete() removes parameter', () => {
+    const params = new Web.URLSearchParams('a=1&b=2&c=3');
+    params.delete('b');
+    TestRunner.assertEqual(params.has('b'), false, 'Should not have b after delete');
+    TestRunner.assertEqual(params.has('a'), true, 'Should still have a');
+    TestRunner.assertEqual(params.has('c'), true, 'Should still have c');
+  });
+
+  TestRunner.test('Web.URLSearchParams - get() returns null for missing key', () => {
+    const params = new Web.URLSearchParams('a=1');
+    TestRunner.assertEqual(params.get('missing'), null, 'Should return null for missing key');
+  });
+
+  TestRunner.test('Web.URLSearchParams - getAll() returns empty array for missing key', () => {
+    const params = new Web.URLSearchParams('a=1');
+    TestRunner.assertEqual(params.getAll('missing').length, 0, 'Should return empty array');
+  });
+
+  TestRunner.test('Web.URLSearchParams - toString() encodes properly', () => {
+    const params = new Web.URLSearchParams();
+    params.append('name', 'John Doe');
+    params.append('email', 'john@example.com');
+    const str = params.toString();
+    TestRunner.assert(str.includes('name=John+Doe'), 'Should encode space as +');
+    TestRunner.assert(str.includes('email=john%40example.com'), 'Should encode @ as %40');
+  });
+
+  TestRunner.test('Web.URLSearchParams - entries() iteration', () => {
+    const params = new Web.URLSearchParams('a=1&b=2');
+    const entries = [...params.entries()];
+    TestRunner.assertEqual(entries.length, 2, 'Should have 2 entries');
+    TestRunner.assertEqual(entries[0][0], 'a', 'First entry key should be a');
+    TestRunner.assertEqual(entries[0][1], '1', 'First entry value should be 1');
+  });
+
+  TestRunner.test('Web.URLSearchParams - keys() iteration', () => {
+    const params = new Web.URLSearchParams('x=1&y=2');
+    const keys = [...params.keys()];
+    TestRunner.assertEqual(keys.length, 2, 'Should have 2 keys');
+    TestRunner.assert(keys.includes('x'), 'Should include x');
+    TestRunner.assert(keys.includes('y'), 'Should include y');
+  });
+
+  TestRunner.test('Web.URLSearchParams - values() iteration', () => {
+    const params = new Web.URLSearchParams('a=hello&b=world');
+    const values = [...params.values()];
+    TestRunner.assertEqual(values.length, 2, 'Should have 2 values');
+    TestRunner.assert(values.includes('hello'), 'Should include hello');
+    TestRunner.assert(values.includes('world'), 'Should include world');
+  });
+
+  TestRunner.test('Web.URLSearchParams - forEach() callback', () => {
+    const params = new Web.URLSearchParams('a=1&b=2');
+    const collected = [];
+    params.forEach((value, name) => {
+      collected.push([name, value]);
+    });
+    TestRunner.assertEqual(collected.length, 2, 'Should iterate 2 times');
+  });
+
+  TestRunner.test('Web.URLSearchParams - for...of iteration', () => {
+    const params = new Web.URLSearchParams('x=10&y=20');
+    let count = 0;
+    for (const [name, value] of params) {
+      count++;
+    }
+    TestRunner.assertEqual(count, 2, 'Should iterate 2 times');
+  });
+
+  TestRunner.test('Web.URLSearchParams - sort() sorts parameters', () => {
+    const params = new Web.URLSearchParams('z=3&a=1&m=2');
+    params.sort();
+    const str = params.toString();
+    const aIndex = str.indexOf('a=');
+    const mIndex = str.indexOf('m=');
+    const zIndex = str.indexOf('z=');
+    TestRunner.assert(aIndex < mIndex, 'a should come before m');
+    TestRunner.assert(mIndex < zIndex, 'm should come before z');
+  });
+
+  TestRunner.test('Web.URLSearchParams - handles special characters', () => {
+    const params = new Web.URLSearchParams();
+    params.append('msg', 'Hello World!');
+    params.append('path', '/user/profile');
+    const str = params.toString();
+    TestRunner.assert(str.includes('Hello+World'), 'Should encode space as +');
+    TestRunner.assert(str.includes('%2Fuser%2Fprofile'), 'Should encode slashes');
+  });
+
+  TestRunner.test('Web.URLSearchParams - size property counts all entries', () => {
+    const params = new Web.URLSearchParams();
+    params.append('a', '1');
+    params.append('a', '2');
+    params.append('b', '3');
+    TestRunner.assertEqual(params.size, 3, 'Should count duplicate keys separately');
+  });
+}
+
+/**
+ * Test URL functionality
+ */
+function testURL() {
+  TestRunner.test('Web.URL - Create from absolute URL', () => {
+    const url = new Web.URL('https://example.com/path');
+    TestRunner.assertEqual(url.protocol, 'https:', 'Protocol should be https:');
+    TestRunner.assertEqual(url.hostname, 'example.com', 'Hostname should be example.com');
+    TestRunner.assertEqual(url.pathname, '/path', 'Pathname should be /path');
+  });
+
+  TestRunner.test('Web.URL - Create with query string', () => {
+    const url = new Web.URL('https://example.com?foo=bar&baz=qux');
+    TestRunner.assertEqual(url.search, '?foo=bar&baz=qux', 'Search should include query string');
+    TestRunner.assertEqual(url.searchParams.get('foo'), 'bar', 'searchParams should parse foo');
+    TestRunner.assertEqual(url.searchParams.get('baz'), 'qux', 'searchParams should parse baz');
+  });
+
+  TestRunner.test('Web.URL - Create with hash', () => {
+    const url = new Web.URL('https://example.com/page#section');
+    TestRunner.assertEqual(url.hash, '#section', 'Hash should be #section');
+  });
+
+  TestRunner.test('Web.URL - Create with port', () => {
+    const url = new Web.URL('https://example.com:8080/path');
+    TestRunner.assertEqual(url.port, '8080', 'Port should be 8080');
+    TestRunner.assertEqual(url.host, 'example.com:8080', 'Host should include port');
+  });
+
+  TestRunner.test('Web.URL - Create with username and password', () => {
+    const url = new Web.URL('https://user:pass@example.com/');
+    TestRunner.assertEqual(url.username, 'user', 'Username should be user');
+    TestRunner.assertEqual(url.password, 'pass', 'Password should be pass');
+  });
+
+  TestRunner.test('Web.URL - Create relative URL with base', () => {
+    const url = new Web.URL('page.html', 'https://example.com/dir/');
+    TestRunner.assertEqual(url.href, 'https://example.com/dir/page.html', 'Should resolve relative URL');
+  });
+
+  TestRunner.test('Web.URL - Create relative path with base', () => {
+    const url = new Web.URL('../other.html', 'https://example.com/dir/page.html');
+    TestRunner.assertEqual(url.pathname, '/other.html', 'Should resolve .. in path');
+  });
+
+  TestRunner.test('Web.URL - href getter returns full URL', () => {
+    const url = new Web.URL('https://user:pass@example.com:8080/path?query=1#hash');
+    const href = url.href;
+    TestRunner.assert(href.includes('https://'), 'Should include protocol');
+    TestRunner.assert(href.includes('user:pass@'), 'Should include credentials');
+    TestRunner.assert(href.includes('example.com:8080'), 'Should include host and port');
+    TestRunner.assert(href.includes('/path'), 'Should include pathname');
+    TestRunner.assert(href.includes('?query=1'), 'Should include search');
+    TestRunner.assert(href.includes('#hash'), 'Should include hash');
+  });
+
+  TestRunner.test('Web.URL - href setter updates all components', () => {
+    const url = new Web.URL('https://example.com');
+    url.href = 'http://other.com:3000/new?param=value#anchor';
+    TestRunner.assertEqual(url.protocol, 'http:', 'Protocol should update');
+    TestRunner.assertEqual(url.hostname, 'other.com', 'Hostname should update');
+    TestRunner.assertEqual(url.port, '3000', 'Port should update');
+    TestRunner.assertEqual(url.pathname, '/new', 'Pathname should update');
+    TestRunner.assertEqual(url.search, '?param=value', 'Search should update');
+    TestRunner.assertEqual(url.hash, '#anchor', 'Hash should update');
+  });
+
+  TestRunner.test('Web.URL - protocol setter', () => {
+    const url = new Web.URL('https://example.com');
+    url.protocol = 'http';
+    TestRunner.assertEqual(url.protocol, 'http:', 'Protocol should be updated with colon');
+  });
+
+  TestRunner.test('Web.URL - hostname setter', () => {
+    const url = new Web.URL('https://example.com');
+    url.hostname = 'other.com';
+    TestRunner.assertEqual(url.hostname, 'other.com', 'Hostname should be updated');
+  });
+
+  TestRunner.test('Web.URL - port setter', () => {
+    const url = new Web.URL('https://example.com');
+    url.port = '9000';
+    TestRunner.assertEqual(url.port, '9000', 'Port should be updated');
+    TestRunner.assertEqual(url.host, 'example.com:9000', 'Host should include new port');
+  });
+
+  TestRunner.test('Web.URL - pathname setter adds leading slash', () => {
+    const url = new Web.URL('https://example.com');
+    url.pathname = 'path/to/resource';
+    TestRunner.assertEqual(url.pathname, '/path/to/resource', 'Pathname should have leading slash');
+  });
+
+  TestRunner.test('Web.URL - search setter updates searchParams', () => {
+    const url = new Web.URL('https://example.com');
+    url.search = '?a=1&b=2';
+    TestRunner.assertEqual(url.searchParams.get('a'), '1', 'searchParams should update with search');
+    TestRunner.assertEqual(url.searchParams.get('b'), '2', 'searchParams should have all params');
+  });
+
+  TestRunner.test('Web.URL - searchParams updates search', () => {
+    const url = new Web.URL('https://example.com');
+    url.searchParams.append('foo', 'bar');
+    url.searchParams.append('baz', 'qux');
+    TestRunner.assert(url.search.includes('foo=bar'), 'Search should update when searchParams changes');
+    TestRunner.assert(url.search.includes('baz=qux'), 'Search should include all params');
+  });
+
+  TestRunner.test('Web.URL - hash setter', () => {
+    const url = new Web.URL('https://example.com');
+    url.hash = 'section';
+    TestRunner.assertEqual(url.hash, '#section', 'Hash should be added with # prefix');
+  });
+
+  TestRunner.test('Web.URL - origin for https', () => {
+    const url = new Web.URL('https://example.com:443/path');
+    TestRunner.assertEqual(url.origin, 'https://example.com:443', 'Origin should include protocol and host');
+  });
+
+  TestRunner.test('Web.URL - origin for file URL', () => {
+    const url = new Web.URL('file:///path/to/file.txt');
+    TestRunner.assertEqual(url.origin, 'null', 'File URL origin should be null');
+  });
+
+  TestRunner.test('Web.URL - toString() returns href', () => {
+    const url = new Web.URL('https://example.com/path');
+    TestRunner.assertEqual(url.toString(), url.href, 'toString should return href');
+  });
+
+  TestRunner.test('Web.URL - toJSON() returns href', () => {
+    const url = new Web.URL('https://example.com/path');
+    TestRunner.assertEqual(url.toJSON(), url.href, 'toJSON should return href');
+  });
+
+  TestRunner.test('Web.URL - handles complex relative paths', () => {
+    const url = new Web.URL('../../other/page.html', 'https://example.com/a/b/c/current.html');
+    TestRunner.assertEqual(url.pathname, '/a/other/page.html', 'Should resolve complex relative path');
+  });
+
+  TestRunner.test('Web.URL - throws on invalid URL', () => {
+    let threw = false;
+    try {
+      new Web.URL('not a valid url');
+    } catch (e) {
+      threw = true;
+    }
+    TestRunner.assert(threw, 'Should throw on invalid URL');
+  });
+
+  TestRunner.test('Web.URL - throws on invalid base URL', () => {
+    let threw = false;
+    try {
+      new Web.URL('page.html', 'not valid base');
+    } catch (e) {
+      threw = true;
+    }
+    TestRunner.assert(threw, 'Should throw on invalid base URL');
+  });
+
+  TestRunner.test('Web.URL - host setter updates hostname and port', () => {
+    const url = new Web.URL('https://example.com');
+    url.host = 'other.com:8080';
+    TestRunner.assertEqual(url.hostname, 'other.com', 'Hostname should be extracted');
+    TestRunner.assertEqual(url.port, '8080', 'Port should be extracted');
+  });
+}
+
+// ============================================================================
+// Web.ReadableStream Tests
+// ============================================================================
+
+function testReadableStream() {
+  // Constructor Tests
+  TestRunner.test('ReadableStream - Create empty stream', () => {
+    const stream = new Web.ReadableStream();
+    TestRunner.assert(stream, 'Stream should be created');
+    TestRunner.assertEqual(stream.locked, false, 'Stream should not be locked initially');
+  });
+
+  TestRunner.test('ReadableStream - Create with underlyingSource', () => {
+    let startCalled = false;
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        startCalled = true;
+        controller.enqueue('chunk1');
+        controller.enqueue('chunk2');
+        controller.close();
+      }
+    });
+    TestRunner.assert(startCalled, 'start() should be called during construction');
+    TestRunner.assert(stream, 'Stream should be created');
+  });
+
+  TestRunner.test('ReadableStream - Create with pull function', () => {
+    const stream = new Web.ReadableStream({
+      pull(controller) {
+        controller.enqueue('pulled');
+        controller.close();
+      }
+    });
+    TestRunner.assert(stream, 'Stream with pull should be created');
+  });
+
+  TestRunner.test('ReadableStream - Create with cancel function', () => {
+    let cancelCalled = false;
+    const stream = new Web.ReadableStream({
+      cancel(reason) {
+        cancelCalled = true;
+      }
+    });
+    stream.cancel('test');
+    TestRunner.assert(cancelCalled, 'cancel() should be called');
+  });
+
+  // Controller Tests
+  TestRunner.test('ReadableStream - Controller enqueue', () => {
+    const chunks = [];
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        controller.enqueue('chunk1');
+        controller.enqueue('chunk2');
+        controller.enqueue('chunk3');
+      }
+    });
+    TestRunner.assert(stream, 'Stream should be created with enqueued chunks');
+  });
+
+  TestRunner.test('ReadableStream - Controller close', () => {
+    let closed = false;
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        controller.enqueue('data');
+        controller.close();
+        closed = true;
+      }
+    });
+    TestRunner.assert(closed, 'Controller should allow close');
+  });
+
+  TestRunner.test('ReadableStream - Controller error', () => {
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        controller.error(new Error('Test error'));
+      }
+    });
+    TestRunner.assert(stream, 'Stream with error should still be created');
+  });
+
+  TestRunner.test('ReadableStream - Controller cannot enqueue after close', () => {
+    TestRunner.assertThrows(() => {
+      new Web.ReadableStream({
+        start(controller) {
+          controller.close();
+          controller.enqueue('late'); // Should throw
+        }
+      });
+    }, 'Should throw when enqueuing after close');
+  });
+
+  TestRunner.test('ReadableStream - Controller desiredSize', () => {
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        TestRunner.assertEqual(controller.desiredSize, 1, 'desiredSize should be 1 initially');
+        controller.enqueue('data');
+        TestRunner.assert(controller.desiredSize !== null, 'desiredSize should not be null');
+      }
+    });
+  });
+
+  // Locking Tests
+  TestRunner.test('ReadableStream - locked property initial state', () => {
+    const stream = new Web.ReadableStream();
+    TestRunner.assertEqual(stream.locked, false, 'New stream should not be locked');
+  });
+
+  TestRunner.test('ReadableStream - getReader locks stream', () => {
+    const stream = new Web.ReadableStream();
+    TestRunner.assertEqual(stream.locked, false, 'Stream should not be locked initially');
+    const reader = stream.getReader();
+    TestRunner.assertEqual(stream.locked, true, 'Stream should be locked after getReader()');
+  });
+
+  TestRunner.test('ReadableStream - Cannot get reader twice', () => {
+    const stream = new Web.ReadableStream();
+    stream.getReader();
+    TestRunner.assertThrows(() => {
+      stream.getReader(); // Should throw
+    }, 'Should throw when getting reader on locked stream');
+  });
+
+  TestRunner.test('ReadableStream - Can get reader after releaseLock', () => {
+    const stream = new Web.ReadableStream();
+    const reader1 = stream.getReader();
+    reader1.releaseLock();
+    TestRunner.assertEqual(stream.locked, false, 'Stream should be unlocked after releaseLock');
+    const reader2 = stream.getReader();
+    TestRunner.assert(reader2, 'Should be able to get new reader after releaseLock');
+  });
+
+  // Cancel Tests
+  TestRunner.test('ReadableStream - cancel() returns promise', () => {
+    const stream = new Web.ReadableStream();
+    const result = stream.cancel();
+    TestRunner.assert(result instanceof Promise, 'cancel() should return a Promise');
+  });
+
+  TestRunner.test('ReadableStream - cancel() with reason', () => {
+    let cancelReason = null;
+    const stream = new Web.ReadableStream({
+      cancel(reason) {
+        cancelReason = reason;
+      }
+    });
+    stream.cancel('test reason');
+    TestRunner.assertEqual(cancelReason, 'test reason', 'cancel() should pass reason to underlyingSource');
+  });
+
+  TestRunner.test('ReadableStream - cancel() multiple times', () => {
+    const stream = new Web.ReadableStream();
+    stream.cancel('first');
+    stream.cancel('second'); // Should not throw
+    TestRunner.assert(true, 'Multiple cancel() calls should not throw');
+  });
+
+  // Reader Tests
+  TestRunner.test('ReadableStreamDefaultReader - Create reader', () => {
+    const stream = new Web.ReadableStream();
+    const reader = stream.getReader();
+    TestRunner.assert(reader instanceof Web.ReadableStreamDefaultReader, 'getReader() should return ReadableStreamDefaultReader');
+  });
+
+  TestRunner.test('ReadableStreamDefaultReader - Cannot create without stream', () => {
+    TestRunner.assertThrows(() => {
+      new Web.ReadableStreamDefaultReader();
+    }, 'Should throw when creating reader without stream');
+  });
+
+  TestRunner.test('ReadableStreamDefaultReader - Cannot create with non-stream', () => {
+    TestRunner.assertThrows(() => {
+      new Web.ReadableStreamDefaultReader({});
+    }, 'Should throw when creating reader with non-stream');
+  });
+
+  TestRunner.test('ReadableStreamDefaultReader - read() returns promise', () => {
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        controller.enqueue('data');
+        controller.close();
+      }
+    });
+    const reader = stream.getReader();
+    const result = reader.read();
+    TestRunner.assert(result instanceof Promise, 'read() should return a Promise');
+  });
+
+  TestRunner.test('ReadableStreamDefaultReader - read() returns {value, done}', async () => {
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        controller.enqueue('chunk1');
+        controller.close();
+      }
+    });
+    const reader = stream.getReader();
+    const result = await reader.read();
+    TestRunner.assert('value' in result, 'Result should have value property');
+    TestRunner.assert('done' in result, 'Result should have done property');
+    TestRunner.assertEqual(result.value, 'chunk1', 'Value should be chunk1');
+    TestRunner.assertEqual(result.done, false, 'Done should be false for data chunk');
+  });
+
+  TestRunner.test('ReadableStreamDefaultReader - read() multiple chunks', async () => {
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        controller.enqueue('chunk1');
+        controller.enqueue('chunk2');
+        controller.enqueue('chunk3');
+        controller.close();
+      }
+    });
+    const reader = stream.getReader();
+    
+    const r1 = await reader.read();
+    TestRunner.assertEqual(r1.value, 'chunk1', 'First read should get chunk1');
+    TestRunner.assertEqual(r1.done, false, 'First read should not be done');
+    
+    const r2 = await reader.read();
+    TestRunner.assertEqual(r2.value, 'chunk2', 'Second read should get chunk2');
+    TestRunner.assertEqual(r2.done, false, 'Second read should not be done');
+    
+    const r3 = await reader.read();
+    TestRunner.assertEqual(r3.value, 'chunk3', 'Third read should get chunk3');
+    TestRunner.assertEqual(r3.done, false, 'Third read should not be done');
+    
+    const r4 = await reader.read();
+    TestRunner.assertEqual(r4.done, true, 'Fourth read should be done');
+  });
+
+  TestRunner.test('ReadableStreamDefaultReader - read() from empty stream', async () => {
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        controller.close();
+      }
+    });
+    const reader = stream.getReader();
+    const result = await reader.read();
+    TestRunner.assertEqual(result.done, true, 'Reading from closed empty stream should be done');
+  });
+
+  TestRunner.test('ReadableStreamDefaultReader - read() calls pull()', async () => {
+    let pullCount = 0;
+    const stream = new Web.ReadableStream({
+      pull(controller) {
+        pullCount++;
+        if (pullCount === 1) {
+          controller.enqueue('pulled data');
+        } else {
+          controller.close();
+        }
+      }
+    });
+    const reader = stream.getReader();
+    
+    const result = await reader.read();
+    TestRunner.assert(pullCount > 0, 'pull() should have been called');
+    TestRunner.assertEqual(result.value, 'pulled data', 'Should get pulled data');
+  });
+
+  TestRunner.test('ReadableStreamDefaultReader - read() with different data types', async () => {
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        controller.enqueue('string');
+        controller.enqueue(123);
+        controller.enqueue({key: 'value'});
+        controller.enqueue([1, 2, 3]);
+        controller.enqueue(null);
+        controller.close();
+      }
+    });
+    const reader = stream.getReader();
+    
+    TestRunner.assertEqual((await reader.read()).value, 'string', 'Should read string');
+    TestRunner.assertEqual((await reader.read()).value, 123, 'Should read number');
+    TestRunner.assertEqual((await reader.read()).value.key, 'value', 'Should read object');
+    TestRunner.assertEqual((await reader.read()).value.length, 3, 'Should read array');
+    TestRunner.assertEqual((await reader.read()).value, null, 'Should read null');
+    TestRunner.assertEqual((await reader.read()).done, true, 'Should be done');
+  });
+
+  TestRunner.test('ReadableStreamDefaultReader - releaseLock()', () => {
+    const stream = new Web.ReadableStream();
+    const reader = stream.getReader();
+    TestRunner.assertEqual(stream.locked, true, 'Stream should be locked');
+    reader.releaseLock();
+    TestRunner.assertEqual(stream.locked, false, 'Stream should be unlocked after releaseLock');
+  });
+
+  TestRunner.test('ReadableStreamDefaultReader - releaseLock() multiple times', () => {
+    const stream = new Web.ReadableStream();
+    const reader = stream.getReader();
+    reader.releaseLock();
+    reader.releaseLock(); // Should not throw
+    TestRunner.assert(true, 'Multiple releaseLock() calls should not throw');
+  });
+
+  TestRunner.test('ReadableStreamDefaultReader - cancel() returns promise', () => {
+    const stream = new Web.ReadableStream();
+    const reader = stream.getReader();
+    const result = reader.cancel();
+    TestRunner.assert(result instanceof Promise, 'reader.cancel() should return a Promise');
+  });
+
+  TestRunner.test('ReadableStreamDefaultReader - cancel() with reason', () => {
+    let cancelReason = null;
+    const stream = new Web.ReadableStream({
+      cancel(reason) {
+        cancelReason = reason;
+      }
+    });
+    const reader = stream.getReader();
+    reader.cancel('test reason');
+    TestRunner.assertEqual(cancelReason, 'test reason', 'reader.cancel() should pass reason');
+  });
+
+  TestRunner.test('ReadableStreamDefaultReader - cancel() closes reader', async () => {
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        controller.enqueue('data');
+      }
+    });
+    const reader = stream.getReader();
+    await reader.cancel();
+    const result = await reader.read();
+    TestRunner.assertEqual(result.done, true, 'Reading after cancel should return done');
+  });
+
+  TestRunner.test('ReadableStreamDefaultReader - closed property is promise', () => {
+    const stream = new Web.ReadableStream();
+    const reader = stream.getReader();
+    TestRunner.assert(reader.closed instanceof Promise, 'closed should be a Promise');
+  });
+
+  TestRunner.test('ReadableStreamDefaultReader - closed resolves when stream closes', async () => {
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        controller.close();
+      }
+    });
+    const reader = stream.getReader();
+    const result = await reader.closed;
+    TestRunner.assert(true, 'closed promise should resolve when stream is closed');
+  });
+
+  // Error Handling Tests
+  TestRunner.test('ReadableStream - Error in start() rejects read()', async () => {
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        controller.error(new Error('Start error'));
+      }
+    });
+    const reader = stream.getReader();
+    
+    let errorCaught = false;
+    try {
+      await reader.read();
+    } catch (err) {
+      errorCaught = true;
+      TestRunner.assert(err.message.includes('Start error'), 'Should throw the error from start');
+    }
+    TestRunner.assert(errorCaught, 'read() should reject with error');
+  });
+
+  TestRunner.test('ReadableStream - Error in pull() rejects read()', async () => {
+    const stream = new Web.ReadableStream({
+      pull(controller) {
+        throw new Error('Pull error');
+      }
+    });
+    const reader = stream.getReader();
+    
+    let errorCaught = false;
+    try {
+      await reader.read();
+    } catch (err) {
+      errorCaught = true;
+      TestRunner.assert(err.message.includes('Pull error'), 'Should throw the error from pull');
+    }
+    TestRunner.assert(errorCaught, 'read() should reject with pull error');
+  });
+
+  TestRunner.test('ReadableStream - controller.error() makes stream errored', async () => {
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        controller.enqueue('data1');
+        controller.error(new Error('Manual error'));
+        controller.enqueue('data2'); // This should throw due to error
+      }
+    });
+    const reader = stream.getReader();
+    
+    const r1 = await reader.read();
+    TestRunner.assertEqual(r1.value, 'data1', 'Should read data before error');
+    
+    let errorCaught = false;
+    try {
+      await reader.read();
+    } catch (err) {
+      errorCaught = true;
+    }
+    TestRunner.assert(errorCaught, 'Reading errored stream should reject');
+  });
+
+  TestRunner.test('ReadableStream - closed property rejects on error', async () => {
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        controller.error(new Error('Stream error'));
+      }
+    });
+    const reader = stream.getReader();
+    
+    let errorCaught = false;
+    try {
+      await reader.closed;
+    } catch (err) {
+      errorCaught = true;
+    }
+    TestRunner.assert(errorCaught, 'closed should reject when stream is errored');
+  });
+
+  // Edge Cases
+  TestRunner.test('ReadableStream - Empty underlyingSource', () => {
+    const stream = new Web.ReadableStream({});
+    TestRunner.assert(stream, 'Stream should work with empty underlyingSource');
+  });
+
+  TestRunner.test('ReadableStream - Null underlyingSource', () => {
+    const stream = new Web.ReadableStream(null);
+    TestRunner.assert(stream, 'Stream should work with null underlyingSource');
+  });
+
+  TestRunner.test('ReadableStream - Undefined underlyingSource', () => {
+    const stream = new Web.ReadableStream(undefined);
+    TestRunner.assert(stream, 'Stream should work with undefined underlyingSource');
+  });
+
+  TestRunner.test('ReadableStream - Read after releaseLock and reacquire', async () => {
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        controller.enqueue('chunk1');
+        controller.enqueue('chunk2');
+        controller.close();
+      }
+    });
+    
+    const reader1 = stream.getReader();
+    const r1 = await reader1.read();
+    TestRunner.assertEqual(r1.value, 'chunk1', 'First reader should get chunk1');
+    reader1.releaseLock();
+    
+    const reader2 = stream.getReader();
+    const r2 = await reader2.read();
+    TestRunner.assertEqual(r2.value, 'chunk2', 'Second reader should get chunk2');
+  });
+
+  TestRunner.test('ReadableStream - Large number of chunks', async () => {
+    const chunkCount = 100;
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        for (let i = 0; i < chunkCount; i++) {
+          controller.enqueue(`chunk${i}`);
+        }
+        controller.close();
+      }
+    });
+    
+    const reader = stream.getReader();
+    for (let i = 0; i < chunkCount; i++) {
+      const result = await reader.read();
+      TestRunner.assertEqual(result.value, `chunk${i}`, `Should read chunk${i}`);
+      TestRunner.assertEqual(result.done, false, `Read ${i} should not be done`);
+    }
+    
+    const final = await reader.read();
+    TestRunner.assertEqual(final.done, true, 'Final read should be done');
+  });
+
+  TestRunner.test('ReadableStream - Binary data chunks', async () => {
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        controller.enqueue(new Uint8Array([1, 2, 3]));
+        controller.enqueue(new Uint8Array([4, 5, 6]));
+        controller.close();
+      }
+    });
+    
+    const reader = stream.getReader();
+    const r1 = await reader.read();
+    TestRunner.assert(r1.value instanceof Uint8Array, 'Should preserve Uint8Array type');
+    TestRunner.assertEqual(r1.value[0], 1, 'Should have correct binary data');
+  });
+
+  TestRunner.test('ReadableStream - Integration with string data', async () => {
+    const texts = ['Hello', ' ', 'World', '!'];
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        texts.forEach(text => controller.enqueue(text));
+        controller.close();
+      }
+    });
+    
+    const reader = stream.getReader();
+    let result = '';
+    let chunk;
+    
+    while (!(chunk = await reader.read()).done) {
+      result += chunk.value;
+    }
+    
+    TestRunner.assertEqual(result, 'Hello World!', 'Should concatenate all chunks');
+  });
+
+  TestRunner.test('ReadableStream - Pull called multiple times', async () => {
+    let pullCount = 0;
+    const stream = new Web.ReadableStream({
+      pull(controller) {
+        pullCount++;
+        if (pullCount <= 3) {
+          controller.enqueue(`pull${pullCount}`);
+        } else {
+          controller.close();
+        }
+      }
+    });
+    
+    const reader = stream.getReader();
+    await reader.read(); // pull1
+    await reader.read(); // pull2
+    await reader.read(); // pull3
+    const final = await reader.read(); // close
+    
+    TestRunner.assert(pullCount >= 3, 'pull() should be called multiple times');
+    TestRunner.assertEqual(final.done, true, 'Stream should be closed after pulls');
+  });
+
+  TestRunner.test('ReadableStream - Lazy pull (only when needed)', async () => {
+    let pullCount = 0;
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        controller.enqueue('preloaded');
+      },
+      pull(controller) {
+        pullCount++;
+        controller.enqueue('pulled');
+        controller.close();
+      }
+    });
+    
+    const reader = stream.getReader();
+    TestRunner.assertEqual(pullCount, 0, 'pull() should not be called yet');
+    
+    await reader.read(); // Gets preloaded
+    TestRunner.assertEqual(pullCount, 0, 'pull() should not be called for preloaded data');
+    
+    await reader.read(); // Triggers pull
+    TestRunner.assert(pullCount > 0, 'pull() should be called when queue is empty');
+  });
+
+  TestRunner.test('ReadableStream - State after cancel', async () => {
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        controller.enqueue('data1');
+        controller.enqueue('data2');
+      }
+    });
+    
+    const reader = stream.getReader();
+    await reader.read(); // Read one chunk
+    await reader.cancel();
+    
+    const result = await reader.read();
+    TestRunner.assertEqual(result.done, true, 'Read after cancel should return done');
+  });
+}
+
+/**
  * Main test runner function
  * Call this from Google Apps Script editor to run all tests
  */
@@ -1071,6 +2012,15 @@ function runAllTests() {
   Logger.log('\nRunning Web.do tests...');
   testWebDo();
   
+  Logger.log('\nRunning URLSearchParams tests...');
+  testURLSearchParams();
+  
+  Logger.log('\nRunning URL tests...');
+  testURL();
+  
+  Logger.log('\nRunning ReadableStream tests...');
+  testReadableStream();
+  
   return TestRunner.summary();
 }
 
@@ -1087,6 +2037,9 @@ function runQuickTests() {
   testResponse();
   testRequest();
   testFormData();
+  testURLSearchParams();
+  testURL();
+  testReadableStream();
   
   return TestRunner.summary();
 }

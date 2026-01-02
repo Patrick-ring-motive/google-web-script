@@ -270,13 +270,14 @@
 
     /**
      * Converts various data types to byte arrays
-     * Handles strings, ArrayBuffers, Uint8Arrays, and objects with getBytes() methods
+     * Handles strings, ArrayBuffers, Uint8Arrays, FormData, and objects with getBytes() methods
      * 
      * WHY SO COMPLEX: This function bridges the gap between Web APIs (which use
      * ArrayBuffer/Uint8Array) and Google Apps Script (which uses byte arrays from
      * Utilities.newBlob). It needs to handle:
      * - Web standard types (ArrayBuffer, Uint8Array)
      * - Google Apps Script Blobs (with getBytes())
+     * - FormData (via &toBlob method)
      * - Plain strings
      * - Nested arrays of any of the above
      * 
@@ -292,6 +293,10 @@
         }
         if (isBuffer(x) || hasBuffer(x)) {
             return Object.setPrototypeOf(new Uint8Array(x.buffer ?? x), Array.prototype);
+        }
+        // Handle FormData by converting to multipart blob first
+        if (instanceOf(x, Web.FormData) || x?.constructor?.name === 'FormData') {
+            return Web.FormData.prototype['&toBlob'].call(x).getBytes();
         }
         if (hasBits(x)) {
             return Object.setPrototypeOf(getBits(x), Array.prototype);
@@ -402,6 +407,22 @@
          */
         slice() {
             return new Web.Blob(this.getBytes().slice(...arguments), this.getContentType());
+        }
+
+        /**
+         * Returns a ReadableStream that provides access to the blob's data
+         * @returns {Web.ReadableStream} Stream of blob data
+         */
+        stream() {
+            const bytes = this.getBytes();
+            return new Web.ReadableStream({
+                start(controller) {
+                    // Enqueue the entire blob as a single chunk
+                    // For a real streaming implementation, this would chunk the data
+                    controller.enqueue(new Uint8Array(bytes));
+                    controller.close();
+                }
+            });
         }
 
     };
@@ -1273,6 +1294,17 @@
         }
 
         /**
+         * Gets the response body as a ReadableStream
+         * @returns {Web.ReadableStream} Body stream
+         */
+        get body() {
+            if (!this[$body]) {
+                return null;
+            }
+            return this[$body].stream();
+        }
+
+        /**
          * Headers property getter
          * @returns {Web.Headers} Headers object
          */
@@ -1647,6 +1679,17 @@
             }
             
             return Object.setPrototypeOf($this, Web.Request.prototype);
+        }
+
+        /**
+         * Gets the request body as a ReadableStream
+         * @returns {Web.ReadableStream} Body stream
+         */
+        get body() {
+            if (!this[$body]) {
+                return null;
+            }
+            return this[$body].stream();
         }
 
         /**
@@ -2195,6 +2238,1027 @@
             delete globalThis.doPost;
         }
     };
+
+    setProperty(Web, { removeEventListener });
+
+    /**
+     * Web.URLSearchParams - URLSearchParams API implementation
+     * 
+     * Provides an interface to work with URL query strings. Supports constructing
+     * from strings, objects, or iterables, and provides methods for manipulating
+     * query parameters.
+     * 
+     * Based on: https://github.com/lifaon74/url-polyfill
+     */
+
+    /**
+     * Serializes a parameter value for URL encoding
+     * Encodes according to application/x-www-form-urlencoded format
+     * Spaces become '+' instead of '%20'
+     */
+    const serializeParam = (value) => {
+        return encodeURIComponent(value).replace(/%20/g, '+');
+    };
+
+    /**
+     * Deserializes a parameter value from URL encoding
+     * '+' becomes space, then decodeURIComponent handles the rest
+     */
+    const deserializeParam = (value) => {
+        return decodeURIComponent(String(value).replace(/\+/g, ' '));
+    };
+
+    // Private symbol for URLSearchParams entries storage
+    const $urlEntries = Symbol('*urlEntries');
+
+    const URLSearchParams = class WebURLSearchParams {
+        /**
+         * Creates a new URLSearchParams object
+         * @param {string|Object|Array|URLSearchParams} init - Initial query parameters
+         */
+        constructor(init) {
+            this[$urlEntries] = {};
+
+            const typeofInit = typeof init;
+
+            if (typeofInit === 'undefined') {
+                // Empty URLSearchParams
+            } else if (typeofInit === 'string') {
+                if (init !== '') {
+                    this['&fromString'](init);
+                }
+            } else if (instanceOf(init, URLSearchParams)) {
+                const _this = this;
+                init.forEach(function(value, name) {
+                    _this.append(name, value);
+                });
+            } else if ((init !== null) && (typeofInit === 'object')) {
+                if (isArray(init)) {
+                    // Array of [name, value] pairs
+                    for (let i = 0; i !== init.length; ++i) {
+                        const entry = init[i];
+                        if (isArray(entry) && entry.length === 2) {
+                            this.append(entry[0], entry[1]);
+                        } else {
+                            throw new TypeError('Expected [string, any] as entry at index ' + i + ' of URLSearchParams\'s input');
+                        }
+                    }
+                } else {
+                    // Plain object
+                    for (const key in init) {
+                        if (init.hasOwnProperty(key)) {
+                            this.append(key, init[key]);
+                        }
+                    }
+                }
+            } else {
+                throw new TypeError('Unsupported input\'s type for URLSearchParams');
+            }
+        }
+
+        /**
+         * Appends a new value to an existing key, or adds the key if it doesn't exist
+         * @param {string} name - Parameter name
+         * @param {*} value - Parameter value
+         */
+        append(name, value) {
+            if (arguments.length < 2) {
+                throw new TypeError('Failed to execute \'append\' on \'URLSearchParams\': 2 arguments required.');
+            }
+            name = String(name);
+            value = String(value);
+            if (name in this[$urlEntries]) {
+                this[$urlEntries][name].push(value);
+            } else {
+                this[$urlEntries][name] = [value];
+            }
+        }
+
+        /**
+         * Deletes a parameter by name
+         * @param {string} name - Parameter name to delete
+         */
+        delete(name) {
+            if (arguments.length < 1) {
+                throw new TypeError('Failed to execute \'delete\' on \'URLSearchParams\': 1 argument required.');
+            }
+            delete this[$urlEntries][String(name)];
+        }
+
+        /**
+         * Gets the first value associated with a parameter name
+         * @param {string} name - Parameter name
+         * @returns {string|null} First value or null if not found
+         */
+        get(name) {
+            if (arguments.length < 1) {
+                throw new TypeError('Failed to execute \'get\' on \'URLSearchParams\': 1 argument required.');
+            }
+            name = String(name);
+            return (name in this[$urlEntries]) ? this[$urlEntries][name][0] : null;
+        }
+
+        /**
+         * Gets all values associated with a parameter name
+         * @param {string} name - Parameter name
+         * @returns {Array<string>} Array of values
+         */
+        getAll(name) {
+            if (arguments.length < 1) {
+                throw new TypeError('Failed to execute \'getAll\' on \'URLSearchParams\': 1 argument required.');
+            }
+            name = String(name);
+            return (name in this[$urlEntries]) ? this[$urlEntries][name].slice(0) : [];
+        }
+
+        /**
+         * Checks if a parameter exists
+         * @param {string} name - Parameter name
+         * @returns {boolean} True if parameter exists
+         */
+        has(name) {
+            if (arguments.length < 1) {
+                throw new TypeError('Failed to execute \'has\' on \'URLSearchParams\': 1 argument required.');
+            }
+            return String(name) in this[$urlEntries];
+        }
+
+        /**
+         * Sets a parameter to a single value, replacing any existing values
+         * @param {string} name - Parameter name
+         * @param {*} value - Parameter value
+         */
+        set(name, value) {
+            if (arguments.length < 2) {
+                throw new TypeError('Failed to execute \'set\' on \'URLSearchParams\': 2 arguments required.');
+            }
+            name = String(name);
+            this[$urlEntries][name] = [String(value)];
+        }
+
+        /**
+         * Executes a callback for each parameter
+         * @param {Function} callback - Function to execute for each entry
+         * @param {*} thisArg - Value to use as 'this' when executing callback
+         */
+        forEach(callback, thisArg) {
+            if (arguments.length < 1) {
+                throw new TypeError('Failed to execute \'forEach\' on \'URLSearchParams\': 1 argument required.');
+            }
+            for (const name in this[$urlEntries]) {
+                if (this[$urlEntries].hasOwnProperty(name)) {
+                    const values = this[$urlEntries][name];
+                    for (let i = 0; i !== values.length; ++i) {
+                        callback.call(thisArg, values[i], name, this);
+                    }
+                }
+            }
+        }
+
+        /**
+         * Returns an iterator of [name, value] pairs
+         * @returns {Iterator} Iterator of entries
+         */
+        * entries() {
+            for (const name in this[$urlEntries]) {
+                if (this[$urlEntries].hasOwnProperty(name)) {
+                    const values = this[$urlEntries][name];
+                    for (let i = 0; i !== values.length; ++i) {
+                        yield [name, values[i]];
+                    }
+                }
+            }
+        }
+
+        /**
+         * Returns an iterator of parameter names
+         * @returns {Iterator} Iterator of keys
+         */
+        * keys() {
+            for (const name in this[$urlEntries]) {
+                if (this[$urlEntries].hasOwnProperty(name)) {
+                    const values = this[$urlEntries][name];
+                    for (let i = 0; i !== values.length; ++i) {
+                        yield name;
+                    }
+                }
+            }
+        }
+
+        /**
+         * Returns an iterator of parameter values
+         * @returns {Iterator} Iterator of values
+         */
+        * values() {
+            for (const name in this[$urlEntries]) {
+                if (this[$urlEntries].hasOwnProperty(name)) {
+                    const values = this[$urlEntries][name];
+                    for (let i = 0; i !== values.length; ++i) {
+                        yield values[i];
+                    }
+                }
+            }
+        }
+
+        /**
+         * Makes URLSearchParams iterable (for...of loops)
+         * @returns {Iterator} Iterator of [name, value] pairs
+         */
+        [Symbol.iterator]() {
+            return this.entries();
+        }
+
+        /**
+         * Returns the query string representation
+         * @returns {string} Serialized query string
+         */
+        toString() {
+            const pairs = [];
+            this.forEach(function(value, name) {
+                pairs.push(serializeParam(name) + '=' + serializeParam(value));
+            });
+            return pairs.join('&');
+        }
+
+        /**
+         * Sorts all name-value pairs by their names
+         * Sorting is done by comparing code units
+         */
+        sort() {
+            const entries = [];
+            this.forEach(function(value, name) {
+                entries.push([name, value]);
+            });
+            entries.sort(function(a, b) {
+                return a[0] < b[0] ? -1 : (a[0] > b[0] ? 1 : 0);
+            });
+            this[$urlEntries] = {};
+            for (let i = 0; i !== entries.length; ++i) {
+                this.append(entries[i][0], entries[i][1]);
+            }
+        }
+
+        /**
+         * Gets the number of search parameters
+         * @returns {number} Number of parameters (counting duplicates)
+         */
+        get size() {
+            let count = 0;
+            for (const name in this[$urlEntries]) {
+                if (this[$urlEntries].hasOwnProperty(name)) {
+                    count += this[$urlEntries][name].length;
+                }
+            }
+            return count;
+        }
+    };
+
+    // Hidden method for parsing query strings
+    setHidden(URLSearchParams.prototype, '&fromString', function fromString(searchString) {
+        if (searchString.charAt(0) === '?') {
+            searchString = searchString.slice(1);
+        }
+        const pairs = searchString.split('&');
+        for (let i = 0; i !== pairs.length; ++i) {
+            const pair = pairs[i];
+            const index = pair.indexOf('=');
+            if (index > -1) {
+                this.append(
+                    deserializeParam(pair.slice(0, index)),
+                    deserializeParam(pair.slice(index + 1))
+                );
+            } else if (pair) {
+                this.append(deserializeParam(pair), '');
+            }
+        }
+    });
+
+    setProperty(Web, { URLSearchParams });
+
+    /**
+     * Web.URL - URL API implementation
+     * 
+     * Provides an interface to parse and construct URLs. This implementation
+     * does not use DOM (document/anchor elements) since they're not available
+     * in Google Apps Script. Instead, it uses regex-based parsing.
+     * 
+     * Based on: https://github.com/lifaon74/url-polyfill
+     * Adapted for non-DOM environment (Google Apps Script)
+     */
+
+    // URL parsing regex pattern
+    // Matches: protocol://username:password@host:port/path?query#hash
+    const urlPattern = /^(?:([a-z][a-z0-9+.-]*):)?(?:\/\/((?:([^:@]*)(?::([^@]*))?@)?([^:/\?#]*)(?::(\d+))?))?([^?#]*)(?:\?([^#]*))?(?:#(.*))?$/i;
+
+    // Private symbols for URL internal state
+    const $protocol = Symbol('*protocol');
+    const $username = Symbol('*username');
+    const $password = Symbol('*password');
+    const $hostname = Symbol('*hostname');
+    const $port = Symbol('*port');
+    const $pathname = Symbol('*pathname');
+    const $search = Symbol('*search');
+    const $hash = Symbol('*hash');
+    const $searchParams = Symbol('*searchParams');
+    const $updateSearchParams = Symbol('*updateSearchParams');
+
+    const URL = class WebURL {
+        /**
+         * Creates a new URL object
+         * @param {string} url - URL string to parse
+         * @param {string} base - Optional base URL
+         */
+        constructor(url, base) {
+            if (typeof url !== 'string') url = String(url);
+            if (base && typeof base !== 'string') base = String(base);
+
+            let parsedBase = null;
+            if (base) {
+                parsedBase = this['&parse'](base);
+                if (!parsedBase) {
+                    throw new TypeError('Invalid base URL: ' + base);
+                }
+            }
+
+            const parsed = this['&parse'](url, parsedBase);
+            if (!parsed) {
+                throw new TypeError('Invalid URL: ' + url);
+            }
+
+            // Store parsed components using symbols
+            this[$protocol] = parsed.protocol;
+            this[$username] = parsed.username;
+            this[$password] = parsed.password;
+            this[$hostname] = parsed.hostname;
+            this[$port] = parsed.port;
+            this[$pathname] = parsed.pathname;
+            this[$search] = parsed.search;
+            this[$hash] = parsed.hash;
+
+            // Create linked searchParams that updates search when modified
+            const searchParams = new Web.URLSearchParams(this[$search]);
+            let enableSearchUpdate = true;
+
+            const _this = this;
+            ['append', 'delete', 'set', 'sort'].forEach(function(methodName) {
+                const method = searchParams[methodName];
+                searchParams[methodName] = function() {
+                    method.apply(searchParams, arguments);
+                    if (enableSearchUpdate) {
+                        _this[$search] = searchParams.toString();
+                    }
+                };
+            });
+
+            this[$searchParams] = searchParams;
+            this[$updateSearchParams] = function() {
+                if (enableSearchUpdate) {
+                    enableSearchUpdate = false;
+                    this[$searchParams][$urlEntries] = {};
+                    this[$searchParams]['&fromString'](this[$search]);
+                    enableSearchUpdate = true;
+                }
+            };
+        }
+
+        /**
+         * Gets the full URL string
+         * @returns {string} Full URL
+         */
+        get href() {
+            return this.protocol + '//' +
+                (this.username ? (this.username + (this.password ? ':' + this.password : '') + '@') : '') +
+                this.host +
+                this.pathname +
+                (this.search ? '?' + this.search : '') +
+                (this.hash ? '#' + this.hash : '');
+        }
+
+        set href(value) {
+            const parsed = this['&parse'](value);
+            if (!parsed) {
+                throw new TypeError('Invalid URL: ' + value);
+            }
+            this[$protocol] = parsed.protocol;
+            this[$username] = parsed.username;
+            this[$password] = parsed.password;
+            this[$hostname] = parsed.hostname;
+            this[$port] = parsed.port;
+            this[$pathname] = parsed.pathname;
+            this[$search] = parsed.search;
+            this[$hash] = parsed.hash;
+            this[$updateSearchParams]();
+        }
+
+        get protocol() {
+            return this[$protocol];
+        }
+
+        set protocol(value) {
+            this[$protocol] = String(value);
+            if (!this[$protocol].endsWith(':')) {
+                this[$protocol] += ':';
+            }
+        }
+
+        get username() {
+            return this[$username];
+        }
+
+        set username(value) {
+            this[$username] = String(value);
+        }
+
+        get password() {
+            return this[$password];
+        }
+
+        set password(value) {
+            this[$password] = String(value);
+        }
+
+        get hostname() {
+            return this[$hostname];
+        }
+
+        set hostname(value) {
+            this[$hostname] = String(value);
+        }
+
+        get port() {
+            return this[$port];
+        }
+
+        set port(value) {
+            this[$port] = String(value);
+        }
+
+        get host() {
+            return this.hostname + (this.port ? ':' + this.port : '');
+        }
+
+        set host(value) {
+            const parts = String(value).split(':');
+            this[$hostname] = parts[0];
+            this[$port] = parts[1] || '';
+        }
+
+        get pathname() {
+            return this[$pathname];
+        }
+
+        set pathname(value) {
+            this[$pathname] = String(value);
+            if (this[$pathname].charAt(0) !== '/') {
+                this[$pathname] = '/' + this[$pathname];
+            }
+        }
+
+        get search() {
+            return this[$search] ? '?' + this[$search] : '';
+        }
+
+        set search(value) {
+            value = String(value);
+            if (value.charAt(0) === '?') {
+                value = value.slice(1);
+            }
+            this[$search] = value;
+            this[$updateSearchParams]();
+        }
+
+        get searchParams() {
+            return this[$searchParams];
+        }
+
+        get hash() {
+            return this[$hash] ? '#' + this[$hash] : '';
+        }
+
+        set hash(value) {
+            value = String(value);
+            if (value.charAt(0) === '#') {
+                value = value.slice(1);
+            }
+            this[$hash] = value;
+        }
+
+        get origin() {
+            if (this.protocol === 'blob:') {
+                // For blob URLs, origin is the origin of the URL after 'blob:'
+                try {
+                    const blobPath = this.pathname;
+                    const url = new Web.URL(blobPath);
+                    return url.origin;
+                } catch (e) {
+                    return 'null';
+                }
+            }
+
+            if (this.protocol === 'file:') {
+                return 'null';
+            }
+
+            return this.protocol + '//' + this.hostname + (this.port ? ':' + this.port : '');
+        }
+
+        toString() {
+            return this.href;
+        }
+
+        toJSON() {
+            return this.href;
+        }
+    };
+
+    // Hidden method for parsing URLs
+    setHidden(URL.prototype, '&parse', function parse(url, base) {
+        const match = url.match(urlPattern);
+        if (!match) return null;
+
+        const result = {
+            protocol: match[1] || (base ? base.protocol : ''),
+            username: match[3] || '',
+            password: match[4] || '',
+            hostname: match[5] || (base ? base.hostname : ''),
+            port: match[6] || '',
+            pathname: match[7] || '/',
+            search: match[8] || '',
+            hash: match[9] || ''
+        };
+
+        // If URL is relative (no protocol), use base
+        if (!match[1] && base) {
+            result.protocol = base.protocol;
+            
+            // If URL has no host, use base host
+            if (!match[2]) {
+                result.hostname = base.hostname;
+                result.port = base.port;
+                result.username = base.username;
+                result.password = base.password;
+
+                // If path doesn't start with /, resolve relative to base
+                if (result.pathname && result.pathname.charAt(0) !== '/') {
+                    const basePath = base.pathname.substring(0, base.pathname.lastIndexOf('/') + 1);
+                    result.pathname = basePath + result.pathname;
+                    // Normalize path (resolve . and ..)
+                    result.pathname = this['&normalizePath'](result.pathname);
+                }
+            }
+        }
+
+        // Validate protocol
+        if (!result.protocol) {
+            return null;
+        }
+
+        // Set default ports
+        if (!result.port) {
+            if (result.protocol === 'http:') result.port = '';
+            else if (result.protocol === 'https:') result.port = '';
+            else if (result.protocol === 'ftp:') result.port = '';
+        }
+
+        return result;
+    });
+
+    // Hidden method for normalizing pathnames
+    setHidden(URL.prototype, '&normalizePath', function normalizePath(path) {
+        const segments = path.split('/');
+        const normalized = [];
+
+        for (let i = 0; i !== segments.length; ++i) {
+            const segment = segments[i];
+            if (segment === '..') {
+                normalized.pop();
+            } else if (segment !== '.' && segment !== '') {
+                normalized.push(segment);
+            } else if (segment === '' && i === 0) {
+                normalized.push(segment);
+            }
+        }
+
+        let result = normalized.join('/');
+        if (path.charAt(0) === '/' && result.charAt(0) !== '/') {
+            result = '/' + result;
+        }
+        if (path.endsWith('/') && !result.endsWith('/')) {
+            result += '/';
+        }
+        return result;
+    });
+
+    setProperty(Web, { URL });
+
+    /**
+     * Web.Location - Location API implementation for server-side environments
+     * 
+     * Provides a Location class implementation for environments that lack it.
+     * The Location class extends URL and adds browser Location API compatibility:
+     * - ancestorOrigins: Empty list (server environments have no origin hierarchy)
+     * - assign(url): Updates the href (no navigation in server context)
+     * - reload(forceReload): No-op (no page to reload in server context)
+     * - replace(url): Updates the href (no navigation in server context)
+     * 
+     * This allows code written for browsers to run in serverless environments
+     * without modification, though navigation methods are no-ops since there's
+     * no actual page navigation in Google Apps Script.
+     * 
+     * Based on: https://github.com/Patrick-ring-motive/web-streams-shim/blob/main/extensions/location.js
+     */
+    const Location = class WebLocation extends Web.URL {
+        /**
+         * Creates a new Location object
+         * @param {string} href - URL to represent as location
+         * @param {string} base - Optional base URL
+         */
+        constructor(href, base) {
+            super(href, base);
+        }
+
+        /**
+         * Gets ancestor origins (always empty in server context)
+         * @returns {Object} Object with length property set to 0
+         */
+        get ancestorOrigins() {
+            return {
+                length: 0
+            };
+        }
+
+        /**
+         * Assigns a new URL to the location
+         * In browser context, this would navigate. In server context, just updates href.
+         * @param {string} url - URL to assign
+         */
+        assign(url) {
+            this.href = url;
+        }
+
+        /**
+         * Reloads the current page
+         * No-op in server context (no page to reload)
+         * @param {boolean} forceReload - Whether to force reload from server
+         */
+        reload(forceReload = false) {
+            // No-op in server context
+            // Could log for debugging if needed
+        }
+
+        /**
+         * Replaces the current page with a new URL
+         * In browser context, this would navigate without history entry.
+         * In server context, just updates href.
+         * @param {string} url - URL to replace with
+         */
+        replace(url) {
+            this.href = url;
+        }
+
+        /**
+         * Returns the full URL as a string
+         * @returns {string} Full URL
+         */
+        toString() {
+            return this.href;
+        }
+    };
+
+    setProperty(Web, { Location });
+
+    /**
+     * Web.ReadableStream - Basic synchronous ReadableStream implementation
+     * 
+     * Provides a simplified ReadableStream API for synchronous chunk reading.
+     * This is a "sham" implementation - not truly async/streaming, but provides
+     * API compatibility for code that expects ReadableStream.
+     * 
+     * Key features:
+     * - Constructor accepts underlyingSource with start(), pull(), cancel()
+     * - getReader() returns a ReadableStreamDefaultReader
+     * - locked property indicates if stream has an active reader
+     * - cancel() method to abort the stream
+     * 
+     * Limitations (synchronous sham):
+     * - All operations are synchronous (no true async streaming)
+     * - Chunks are stored in memory (no true backpressure)
+     * - pull() is called synchronously during read()
+     * - No support for byob readers or tee()
+     * 
+     * Based on: https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream
+     */
+    const $streamController = Symbol('streamController');
+    const $streamLocked = Symbol('streamLocked');
+    const $streamCancelled = Symbol('streamCancelled');
+    const $streamReader = Symbol('streamReader');
+
+    const ReadableStream = class WebReadableStream {
+        /**
+         * Creates a new ReadableStream
+         * @param {Object} underlyingSource - Source object with optional start, pull, cancel methods
+         * @param {Object} strategy - Optional queuing strategy (ignored in this sham)
+         */
+        constructor(underlyingSource = {}, strategy = {}) {
+            this[$streamLocked] = false;
+            this[$streamCancelled] = false;
+            this[$streamReader] = null;
+
+            // Create controller for the stream
+            const chunks = [];
+            let closed = false;
+            let errored = null;
+
+            const controller = {
+                enqueue: (chunk) => {
+                    if (closed) {
+                        throw new TypeError('Cannot enqueue after close');
+                    }
+                    if (errored) {
+                        throw errored;
+                    }
+                    chunks.push(chunk);
+                },
+                close: () => {
+                    closed = true;
+                },
+                error: (err) => {
+                    errored = err;
+                    closed = true;
+                },
+                get desiredSize() {
+                    if (closed) return null;
+                    return 1; // Simplified - always ready for more
+                }
+            };
+
+            this[$streamController] = {
+                chunks,
+                get closed() { return closed; },
+                get errored() { return errored; },
+                controller,
+                underlyingSource: underlyingSource || {},
+                pull: underlyingSource?.pull,
+                cancel: underlyingSource?.cancel
+            };
+
+            // Call start() if provided
+            try {
+                if (underlyingSource?.start) {
+                    underlyingSource.start(controller);
+                }
+            } catch (err) {
+                controller.error(err);
+            }
+        }
+
+        /**
+         * Gets whether the stream is locked to a reader
+         * @returns {boolean}
+         */
+        get locked() {
+            return this[$streamLocked];
+        }
+
+        /**
+         * Gets a reader for the stream
+         * @param {Object} options - Optional reader options (mode not supported in sham)
+         * @returns {ReadableStreamDefaultReader}
+         */
+        getReader(options = {}) {
+            if (this[$streamLocked]) {
+                throw new TypeError('ReadableStream is already locked to a reader');
+            }
+            this[$streamLocked] = true;
+            const reader = new Web.ReadableStreamDefaultReader(this);
+            this[$streamReader] = reader;
+            return reader;
+        }
+
+        /**
+         * Cancels the stream
+         * @param {*} reason - Reason for cancellation
+         * @returns {Promise}
+         */
+        cancel(reason) {
+            if (this[$streamCancelled]) {
+                return Promise.resolve();
+            }
+            this[$streamCancelled] = true;
+            this[$streamController].controller.close();
+
+            // Call cancel on underlying source if provided
+            try {
+                if (this[$streamController].cancel) {
+                    this[$streamController].cancel(reason);
+                }
+            } catch (err) {
+                return Promise.reject(err);
+            }
+            return Promise.resolve();
+        }
+
+        /**
+         * Internal method to release the reader lock
+         * @private
+         */
+        ['&releaseLock']() {
+            this[$streamLocked] = false;
+            this[$streamReader] = null;
+        }
+
+        /**
+         * Creates a ReadableStream from an iterable or async iterable
+         * @param {Iterable|AsyncIterable} iterable - Iterable to convert to stream
+         * @returns {Web.ReadableStream} New ReadableStream
+         */
+        static from(iterable) {
+            // Check if it's an async iterable
+            const isAsync = iterable?.[Symbol.asyncIterator];
+            
+            if (isAsync) {
+                // Async iterable
+                return new Web.ReadableStream({
+                    async start(controller) {
+                        try {
+                            for await (const chunk of iterable) {
+                                controller.enqueue(chunk);
+                            }
+                            controller.close();
+                        } catch (err) {
+                            controller.error(err);
+                        }
+                    }
+                });
+            } else {
+                // Synchronous iterable
+                return new Web.ReadableStream({
+                    start(controller) {
+                        try {
+                            // Check if it has Symbol.iterator
+                            if (iterable?.[Symbol.iterator]) {
+                                for (const chunk of iterable) {
+                                    controller.enqueue(chunk);
+                                }
+                            } else if (isArray(iterable)) {
+                                // Handle plain arrays
+                                for (const chunk of iterable) {
+                                    controller.enqueue(chunk);
+                                }
+                            } else {
+                                throw new TypeError('ReadableStream.from requires an iterable');
+                            }
+                            controller.close();
+                        } catch (err) {
+                            controller.error(err);
+                        }
+                    }
+                });
+            }
+        }
+    };
+
+    setProperty(Web, { ReadableStream });
+
+    /**
+     * Web.ReadableStreamDefaultReader - Reader for ReadableStream
+     * 
+     * Provides methods to read chunks from a ReadableStream.
+     * This is a synchronous sham - read() returns a resolved promise immediately.
+     * 
+     * Key methods:
+     * - read() - Returns next chunk as {value, done} or pulls from source
+     * - releaseLock() - Releases the reader's lock on the stream
+     * - cancel() - Cancels the stream
+     * 
+     * Properties:
+     * - closed - Promise that resolves when stream is closed
+     */
+    const $readerStream = Symbol('readerStream');
+    const $readerClosed = Symbol('readerClosed');
+
+    const ReadableStreamDefaultReader = class WebReadableStreamDefaultReader {
+        /**
+         * Creates a new reader for a stream
+         * @param {ReadableStream} stream - Stream to read from
+         */
+        constructor(stream) {
+            if (!instanceOf(stream, Web.ReadableStream)) {
+                throw new TypeError('ReadableStreamDefaultReader requires a ReadableStream');
+            }
+            this[$readerStream] = stream;
+            this[$readerClosed] = false;
+        }
+
+        /**
+         * Reads the next chunk from the stream
+         * @returns {Promise<{value: *, done: boolean}>}
+         */
+        read() {
+            const stream = this[$readerStream];
+            const ctrl = stream[$streamController];
+
+            // Check if stream is closed or errored
+            if (ctrl.errored) {
+                return Promise.reject(ctrl.errored);
+            }
+
+            if (this[$readerClosed]) {
+                return Promise.resolve({ value: undefined, done: true });
+            }
+
+            // If we have queued chunks, return the first one
+            if (ctrl.chunks.length > 0) {
+                const value = ctrl.chunks.shift();
+                return Promise.resolve({ value, done: false });
+            }
+
+            // If stream is closed and no more chunks, we're done
+            if (ctrl.closed) {
+                this[$readerClosed] = true;
+                return Promise.resolve({ value: undefined, done: true });
+            }
+
+            // Try to pull more data
+            try {
+                if (ctrl.pull) {
+                    ctrl.pull(ctrl.controller);
+                }
+
+                // Check if pull added chunks
+                if (ctrl.chunks.length > 0) {
+                    const value = ctrl.chunks.shift();
+                    return Promise.resolve({ value, done: false });
+                }
+
+                // Check if pull closed the stream
+                if (ctrl.closed) {
+                    this[$readerClosed] = true;
+                    return Promise.resolve({ value: undefined, done: true });
+                }
+            } catch (err) {
+                ctrl.controller.error(err);
+                return Promise.reject(err);
+            }
+
+            // No data available and stream not closed
+            return Promise.resolve({ value: undefined, done: true });
+        }
+
+        /**
+         * Releases the reader's lock on the stream
+         */
+        releaseLock() {
+            if (this[$readerClosed]) {
+                return;
+            }
+            const stream = this[$readerStream];
+            if (stream) {
+                stream['&releaseLock']();
+            }
+            this[$readerClosed] = true;
+        }
+
+        /**
+         * Cancels the stream
+         * @param {*} reason - Reason for cancellation
+         * @returns {Promise}
+         */
+        cancel(reason) {
+            if (this[$readerClosed]) {
+                return Promise.resolve();
+            }
+            const stream = this[$readerStream];
+            this[$readerClosed] = true;
+            if (stream) {
+                return stream.cancel(reason);
+            }
+            return Promise.resolve();
+        }
+
+        /**
+         * Promise that resolves when the stream is closed
+         * @returns {Promise}
+         */
+        get closed() {
+            const stream = this[$readerStream];
+            if (!stream) {
+                return Promise.resolve();
+            }
+            const ctrl = stream[$streamController];
+            if (ctrl.closed || this[$readerClosed]) {
+                return Promise.resolve();
+            }
+            if (ctrl.errored) {
+                return Promise.reject(ctrl.errored);
+            }
+            // In a real implementation, this would return a promise that resolves later
+            // For this sham, we return a never-resolving promise
+            return new Promise(() => {});
+        }
+    };
+
+    setProperty(Web, { ReadableStreamDefaultReader });
 
     setProperty(Web, { removeEventListener });
 
