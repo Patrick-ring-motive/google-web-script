@@ -14,12 +14,52 @@
  * 4. Copy the web app URL to client-tests.html configuration
  */
 
+// Helper function to log to Google Drive spreadsheet
+const logToSheet = (()=>{
+  const memo = {};
+
+  return function logToSheet(message, data) {
+    try {
+      const name = 'google-web-scripts-log';
+      const files = memo[name] || DriveApp.getFilesByName(name);
+      memo[name] = files;
+      const file = memo.file || files?.next?.();
+      memo.file = file;
+      const spreadSheet = memo.spreadSheet || SpreadsheetApp.openById(file.getId());
+      memo.spreadSheet = spreadSheet;
+      const sheet = memo.sheet || spreadSheet.getActiveSheet();
+      memo.sheet = sheet;
+      sheet.getActiveSheet().appendRow([new Date(), message, JSON.stringify(data)]);
+    } catch (e) {
+      // Ignore logging errors
+    }
+  };
+})();
+
 // Set up the fetch event listener
 Web.addEventListener('fetch', (request) => {
+  const debugInfo = {
+    timestamp: new Date().toISOString(),
+    requestType: typeof request,
+    hasMethod: 'method' in request,
+    method: request.method,
+    hasParameter: 'parameter' in request,
+    hasParameters: 'parameters' in request,
+  };
+  
+  logToSheet('Request received', debugInfo);
+  
   try {
     const url = request.url || '';
     const rawPath = request.parameter?.path || request.parameters?.path?.[0] || '/';
     const path = decodeURIComponent(rawPath);
+    
+    debugInfo.url = url;
+    debugInfo.rawPath = rawPath;
+    debugInfo.path = path;
+    debugInfo.parameters = request.parameters;
+    
+    logToSheet('Processing path', { path, rawPath, parameters: request.parameters });
     
     // Echo endpoint - returns request details
     if (/echo$/i.test(path)) {
@@ -88,31 +128,48 @@ Web.addEventListener('fetch', (request) => {
     
     // POST endpoint - handles POST requests
     if (/post$/i.test(path)) {
+      logToSheet('POST endpoint matched', { path });
+      debugInfo.endpointMatched = 'POST';
       let receivedData = null;
       
       try {
         const bodyText = request.text();
+        debugInfo.bodyLength = bodyText ? bodyText.length : 0;
+        debugInfo.bodyPreview = bodyText ? bodyText.substring(0, 100) : null;
+        
+        logToSheet('POST body read', { bodyLength: debugInfo.bodyLength, bodyPreview: debugInfo.bodyPreview });
+        
         if (bodyText) {
           receivedData = JSON.parse(bodyText);
+          debugInfo.parsedJSON = true;
+          logToSheet('POST JSON parsed', { keys: Object.keys(receivedData) });
         }
       } catch (e) {
+        debugInfo.parseError = e.toString();
+        logToSheet('POST parse error', { error: e.toString(), stack: e.stack });
         return new Web.Response(JSON.stringify({ 
           error: 'Invalid JSON in request body',
-          message: e.toString()
+          message: e.toString(),
+          debug: debugInfo
         }), {
           status: 400,
           headers: { 'Content-Type': 'application/json' }
         });
       }
       
-      return new Web.Response(JSON.stringify({ 
+      logToSheet('POST returning response', { receivedData });
+      const response = new Web.Response(JSON.stringify({ 
         message: 'POST received',
         received: receivedData,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        debug: debugInfo
       }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       });
+      
+      logToSheet('POST response created', { responseType: typeof response, hasGetContent: typeof response?.getContent === 'function' });
+      return response;
     }
     
     // FormData endpoint - handles multipart/form-data
@@ -217,6 +274,8 @@ Web.addEventListener('fetch', (request) => {
     }
     
     // Default response - API info
+    debugInfo.endpointMatched = 'default';
+    logToSheet('No endpoint matched, returning default', { path });
     return new Web.Response(JSON.stringify({
       message: 'Google Web Script Test API',
       version: '1.0.0',
@@ -228,7 +287,8 @@ Web.addEventListener('fetch', (request) => {
         '/status/{code}': 'Returns specified status code',
         '/headers': 'Returns request headers'
       },
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      debug: debugInfo
     }, null, 2), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
@@ -236,10 +296,14 @@ Web.addEventListener('fetch', (request) => {
     
   } catch (error) {
     // Error handler
+    debugInfo.topLevelError = error.toString();
+    debugInfo.topLevelStack = error.stack;
+    logToSheet('Top-level error', { error: error.toString(), stack: error.stack, debugInfo });
     return new Web.Response(JSON.stringify({
       error: 'Internal Server Error',
       message: error.toString(),
-      stack: error.stack
+      stack: error.stack,
+      debug: debugInfo
     }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
@@ -259,8 +323,8 @@ Web.addEventListener('fetch', (request) => {
 function testBackend() {
   Logger.log('Testing backend setup...');
   
-  // Test with a mock request
-  const mockEvent = {
+  // Test with a mock GET request
+  const mockGetEvent = {
     parameter: { path: '/json' },
     parameters: { path: ['/json'] },
     postData: {
@@ -270,7 +334,30 @@ function testBackend() {
     }
   };
   
-  const response = doGet(mockEvent);
-  Logger.log('Response: ' + response.getContent());
+  const getResponse = doGet(mockGetEvent);
+  Logger.log('GET Response type: ' + typeof getResponse);
+  Logger.log('GET Response has getContent: ' + (typeof getResponse?.getContent === 'function'));
+  if (getResponse && typeof getResponse.getContent === 'function') {
+    Logger.log('GET Response content: ' + getResponse.getContent());
+  }
+  
+  // Test with a mock POST request
+  const mockPostEvent = {
+    parameter: { path: '/post' },
+    parameters: { path: ['/post'] },
+    postData: {
+      contents: '{"test": "data"}',
+      length: 16,
+      type: 'application/json'
+    }
+  };
+  
+  const postResponse = doPost(mockPostEvent);
+  Logger.log('POST Response type: ' + typeof postResponse);
+  Logger.log('POST Response has getContent: ' + (typeof postResponse?.getContent === 'function'));
+  if (postResponse && typeof postResponse.getContent === 'function') {
+    Logger.log('POST Response content: ' + postResponse.getContent());
+  }
+  
   Logger.log('Backend test complete!');
 }

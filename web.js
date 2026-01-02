@@ -162,7 +162,7 @@
             value,
             enumerable: true,
             configurable: false,
-            writeable: false, // Typo preserved from original
+            writeable: false, // for my own sanity
             writable: false
         });
     };
@@ -177,6 +177,7 @@
     const setHidden = (obj, prop, value) => {
         Object.defineProperty(obj, prop, {
             value,
+            writeable:true,
             writable: true,
             enumerable: false,
             configurable: true
@@ -1081,11 +1082,20 @@
             // Extract boundary from content type
             const contentType = blob.type || blob.getContentType?.() || '';
             const boundaryMatch = contentType.match(/boundary=([^;]+)/);
-            if (!boundaryMatch) {
-                throw new Error('Invalid multipart/form-data: no boundary found');
+            let boundary;
+            
+            if (boundaryMatch) {
+                boundary = boundaryMatch[1].trim();
+            } else {
+                // Fallback: extract boundary from the body itself
+                // Multipart bodies always start with --boundary
+                const firstLineMatch = text.match(/^--([^\r\n]+)/);
+                if (!firstLineMatch) {
+                    throw new Error('Invalid multipart/form-data: no boundary found in Content-Type header or body');
+                }
+                boundary = firstLineMatch[1];
             }
             
-            const boundary = boundaryMatch[1].trim();
             const parts = text.split(`--${boundary}`);
             
             // Helper to unescape special characters
@@ -1668,8 +1678,24 @@
          * @returns {Web.FormData} Parsed FormData object
          */
         formData() {
-            const blob = this.blob();
-            return FormData['&fromBlob'](blob);
+            try{
+                const blob = this.blob();
+                return FormData['&fromBlob'](blob);
+            }catch(e){
+                console.warn('Could not parse request body as FormData:', e);
+                const fd = new Web.FormData();
+                for(const key in this.parameters){
+                    const values = this.parameters[key];
+                    if(isArray(values)){
+                        for(const value of values){
+                            fd.append(key, value);
+                        }
+                    } else {
+                        fd.append(key, values);
+                    }
+                }
+                return fd;
+            }
         }
 
         /**
@@ -1876,12 +1902,17 @@
          * @param {Object} e - Event object passed to doGet(e) or doPost(e)
          */
         constructor(e = {}) {
+            e = Object.fromEntries(Object.entries(e || {}));
+            e.postData = Object.fromEntries(Object.entries(e.postData || {}));
             // Merge with defaults
             const eventData = {
                 ...defaultEvent,
                 ...e
             };
             
+            eventData.contentLength = Math.max(e.contentLength || 0, (e.postData?.length || 0));
+            (eventData.postData ?? {}).length = e.postData?.length || e.contentLength || 0;
+
             // Build complete URL using ScriptApp.getService().getUrl() as base
             let baseUrl = '';
             try {
@@ -1911,9 +1942,9 @@
             
             // ScriptApp metadata headers (safe access in case not available)
             try {
-                headers.set('X-ScriptApp-AuthMode', Str(eventData.authMode ?? ScriptApp.AuthMode));
-                headers.set('X-ScriptApp-AuthorizationStatus', Str(eventData.authorizationStatus ?? ScriptApp.AuthorizationStatus));
-                headers.set('X-ScriptApp-EventType', Str(eventData.triggerSource ?? ScriptApp.TriggerSource));
+                headers.set('X-ScriptApp-Auth-Mode', Str(eventData.authMode ?? ScriptApp.AuthMode));
+                headers.set('X-ScriptApp-Authorization-Status', Str(eventData.authorizationStatus ?? ScriptApp.AuthorizationStatus));
+                headers.set('X-ScriptApp-Event-Type', Str(eventData.triggerSource ?? ScriptApp.TriggerSource));
                 headers.set('X-ScriptApp-WeekDay', Str(eventData.weekDay ?? ScriptApp.WeekDay));
                 if (ScriptApp.InstallationSource) {
                     headers.set('X-ScriptApp-InstallationSource', Str(ScriptApp.InstallationSource));
@@ -1933,18 +1964,17 @@
                 // ScriptApp metadata not available
             }
             
-            // Determine method (POST if postData exists, otherwise GET)
-            const method = eventData.postData?.contents ? 'POST' : 'GET';
-            
             // Call parent constructor with synthesized request data
             super(url || '/', {
-                method: method,
+                method: eventData.method || ((eventData.postData?.length>0) ? 'POST' : 'GET'),
                 headers: headers,
                 body: eventData.postData?.contents || ''
             });
             
             // Add all event properties to this instance
             Object.assign(this, eventData);
+
+            return Object.setPrototypeOf(this, Web.RequestEvent.prototype);
         }
 
         /**
@@ -1970,7 +2000,9 @@
          */
         blob() {
             const content = this.postData?.contents || '';
-            const type = this.postData?.type || 'text/plain';
+            // Check postData.type first, then headers as fallback
+            // postData.type should have boundary for multipart/form-data
+            const type = this.postData?.type || this.headers?.get?.('Content-Type') || 'text/plain';
             return new Web.Blob(content, type);
         }
 
@@ -2127,10 +2159,12 @@
         // Special handling for 'fetch' events - set up global doGet/doPost
         if (type === 'fetch') {
             globalThis.doGet = function doGet(e) {
+                e.method = e?.method || e?.parameter?.method || 'GET';
                 return Web.do(e, handler);
             };
 
             globalThis.doPost = function doPost(e) {
+                e.method = e?.method || e?.parameter?.method || 'POST';
                 return Web.do(e, handler);
             };
         }
