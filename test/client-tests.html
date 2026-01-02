@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Google Web Script - Client Tests</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            opacity: 0.9;
+            font-size: 0.9em;
+        }
+        
+        .config-section {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .input-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #333;
+        }
+        
+        input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="text"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #218838;
+        }
+        
+        .test-results {
+            padding: 30px;
+        }
+        
+        .test-item {
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            border-left: 4px solid #ccc;
+            background: #f8f9fa;
+            transition: all 0.3s;
+        }
+        
+        .test-item.running {
+            border-left-color: #ffc107;
+            background: #fff8e1;
+        }
+        
+        .test-item.pass {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+        
+        .test-item.fail {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+        
+        .test-name {
+            font-weight: 600;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .test-status {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        
+        .status-pending {
+            background: #ffc107;
+            color: #856404;
+        }
+        
+        .status-running {
+            background: #17a2b8;
+            color: white;
+        }
+        
+        .status-pass {
+            background: #28a745;
+            color: white;
+        }
+        
+        .status-fail {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .test-details {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .test-error {
+            margin-top: 10px;
+            padding: 10px;
+            background: rgba(220, 53, 69, 0.1);
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            color: #721c24;
+            white-space: pre-wrap;
+        }
+        
+        .summary {
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .summary-stats {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 15px;
+        }
+        
+        .stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+        }
+        
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .stat.pass .stat-value {
+            color: #28a745;
+        }
+        
+        .stat.fail .stat-value {
+            color: #dc3545;
+        }
+        
+        .stat.total .stat-value {
+            color: #667eea;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .note {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin-bottom: 20px;
+            color: #856404;
+        }
+        
+        .note strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 Google Web Script</h1>
+            <div class="subtitle">Client-Side Integration Tests</div>
+        </header>
+        
+        <div class="config-section">
+            <div class="note">
+                <strong>📝 Setup Instructions:</strong>
+                1. Deploy your Google Apps Script as a web app<br>
+                2. Copy the deployment URL and paste it below<br>
+                3. Set the web app to execute as "Me" and allow "Anyone" access<br>
+                4. Make sure your script has Web.addEventListener('fetch', handler) configured
+            </div>
+            
+            <div class="input-group">
+                <label for="webAppUrl">Web App URL:</label>
+                <input 
+                    type="text" 
+                    id="webAppUrl" 
+                    placeholder="https://script.google.com/macros/s/YOUR_DEPLOYMENT_ID/exec"
+                    value="">
+            </div>
+            
+            <div class="button-group">
+                <button class="btn-primary" onclick="runAllTests()">Run All Tests</button>
+                <button class="btn-secondary" onclick="runQuickTests()">Run Quick Tests</button>
+                <button class="btn-success" onclick="saveUrl()">Save URL</button>
+            </div>
+        </div>
+        
+        <div class="test-results">
+            <div id="summary" class="summary hidden">
+                <h2>Test Results</h2>
+                <div class="summary-stats">
+                    <div class="stat pass">
+                        <div class="stat-value" id="passCount">0</div>
+                        <div class="stat-label">Passed</div>
+                    </div>
+                    <div class="stat fail">
+                        <div class="stat-value" id="failCount">0</div>
+                        <div class="stat-label">Failed</div>
+                    </div>
+                    <div class="stat total">
+                        <div class="stat-value" id="totalCount">0</div>
+                        <div class="stat-label">Total</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="testList"></div>
+        </div>
+    </div>
+
+    <script>
+        // Test configuration
+        const config = {
+            webAppUrl: '',
+            timeout: 30000 // 30 seconds
+        };
+
+        // Load saved URL from localStorage
+        window.addEventListener('DOMContentLoaded', () => {
+            const savedUrl = localStorage.getItem('webAppUrl');
+            if (savedUrl) {
+                document.getElementById('webAppUrl').value = savedUrl;
+                config.webAppUrl = savedUrl;
+            }
+        });
+
+        function saveUrl() {
+            const url = document.getElementById('webAppUrl').value.trim();
+            if (!url) {
+                alert('Please enter a Web App URL');
+                return;
+            }
+            localStorage.setItem('webAppUrl', url);
+            config.webAppUrl = url;
+            alert('URL saved successfully!');
+        }
+
+        function getWebAppUrl() {
+            const url = document.getElementById('webAppUrl').value.trim();
+            if (!url) {
+                throw new Error('Please enter a Web App URL first');
+            }
+            config.webAppUrl = url;
+            localStorage.setItem('webAppUrl', url);
+            return url;
+        }
+
+        // Test framework
+        class TestRunner {
+            constructor() {
+                this.tests = [];
+                this.results = {
+                    passed: 0,
+                    failed: 0,
+                    total: 0
+                };
+            }
+
+            addTest(name, fn, category = 'general') {
+                this.tests.push({ name, fn, category, status: 'pending' });
+            }
+
+            async runAll() {
+                this.reset();
+                const listEl = document.getElementById('testList');
+                listEl.innerHTML = '';
+                
+                for (const test of this.tests) {
+                    await this.runTest(test);
+                }
+                
+                this.showSummary();
+            }
+
+            async runQuick() {
+                this.reset();
+                const listEl = document.getElementById('testList');
+                listEl.innerHTML = '';
+                
+                const quickTests = this.tests.filter(t => t.category !== 'integration');
+                
+                for (const test of quickTests) {
+                    await this.runTest(test);
+                }
+                
+                this.showSummary();
+            }
+
+            async runTest(test) {
+                const listEl = document.getElementById('testList');
+                const testEl = this.createTestElement(test);
+                listEl.appendChild(testEl);
+
+                this.updateTestStatus(testEl, 'running');
+                
+                try {
+                    await test.fn();
+                    test.status = 'pass';
+                    this.results.passed++;
+                    this.updateTestStatus(testEl, 'pass');
+                } catch (error) {
+                    test.status = 'fail';
+                    test.error = error.message;
+                    this.results.failed++;
+                    this.updateTestStatus(testEl, 'fail', error.message);
+                }
+                
+                this.results.total++;
+                this.updateSummary();
+            }
+
+            createTestElement(test) {
+                const div = document.createElement('div');
+                div.className = 'test-item';
+                div.innerHTML = `
+                    <div class="test-name">
+                        <span class="test-status status-pending">PENDING</span>
+                        <span>${test.name}</span>
+                    </div>
+                    <div class="test-details"></div>
+                `;
+                return div;
+            }
+
+            updateTestStatus(el, status, error = null) {
+                el.className = `test-item ${status}`;
+                const statusEl = el.querySelector('.test-status');
+                const detailsEl = el.querySelector('.test-details');
+                
+                statusEl.className = `test-status status-${status}`;
+                statusEl.textContent = status.toUpperCase();
+                
+                if (status === 'running') {
+                    detailsEl.innerHTML = '<span class="spinner"></span> Running...';
+                } else if (status === 'pass') {
+                    detailsEl.textContent = '✓ Test passed';
+                } else if (status === 'fail') {
+                    detailsEl.innerHTML = `✗ Test failed${error ? `<div class="test-error">${error}</div>` : ''}`;
+                }
+            }
+
+            updateSummary() {
+                document.getElementById('passCount').textContent = this.results.passed;
+                document.getElementById('failCount').textContent = this.results.failed;
+                document.getElementById('totalCount').textContent = this.results.total;
+            }
+
+            showSummary() {
+                document.getElementById('summary').classList.remove('hidden');
+            }
+
+            reset() {
+                this.results = { passed: 0, failed: 0, total: 0 };
+                document.getElementById('summary').classList.add('hidden');
+            }
+        }
+
+        const runner = new TestRunner();
+
+        // Assertion helpers
+        function assert(condition, message) {
+            if (!condition) {
+                throw new Error(message || 'Assertion failed');
+            }
+        }
+
+        function assertEqual(actual, expected, message) {
+            if (actual !== expected) {
+                throw new Error(message || `Expected ${expected}, got ${actual}`);
+            }
+        }
+
+        function assertContains(str, substring, message) {
+            if (!str.includes(substring)) {
+                throw new Error(message || `Expected string to contain "${substring}"`);
+            }
+        }
+
+        // ============================================================================
+        // Integration Tests
+        // ============================================================================
+
+        runner.addTest('Basic GET request', async () => {
+            const url = getWebAppUrl();
+            const response = await fetch(url);
+            assert(response.ok, 'Response should be ok');
+        }, 'integration');
+
+        runner.addTest('GET request returns JSON', async () => {
+            const url = getWebAppUrl();
+            const response = await fetch(url);
+            const data = await response.json();
+            assert(data, 'Should return JSON data');
+        }, 'integration');
+
+        runner.addTest('POST request with JSON body', async () => {
+            const url = getWebAppUrl();
+            const testData = { message: 'Hello from client', timestamp: Date.now() };
+            
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(testData)
+            });
+            
+            assert(response.ok, 'POST should succeed');
+        }, 'integration');
+
+        runner.addTest('Custom headers are received', async () => {
+            const url = getWebAppUrl();
+            const response = await fetch(url, {
+                headers: { 'X-Custom-Header': 'test-value' }
+            });
+            
+            assert(response.ok, 'Request with custom header should succeed');
+        }, 'integration');
+
+        runner.addTest('Query parameters are received', async () => {
+            const url = getWebAppUrl() + '?test=value&foo=bar';
+            const response = await fetch(url);
+            assert(response.ok, 'Request with query params should succeed');
+        }, 'integration');
+
+        runner.addTest('POST with form data', async () => {
+            const url = getWebAppUrl();
+            const formData = new URLSearchParams();
+            formData.append('field1', 'value1');
+            formData.append('field2', 'value2');
+            
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formData.toString()
+            });
+            
+            assert(response.ok, 'POST with form data should succeed');
+        }, 'integration');
+
+        runner.addTest('Response has correct content-type', async () => {
+            const url = getWebAppUrl();
+            const response = await fetch(url);
+            const contentType = response.headers.get('content-type');
+            assert(contentType, 'Response should have content-type header');
+        }, 'integration');
+
+        runner.addTest('Large JSON payload', async () => {
+            const url = getWebAppUrl();
+            const largeData = {
+                items: Array.from({ length: 100 }, (_, i) => ({
+                    id: i,
+                    name: `Item ${i}`,
+                    data: 'x'.repeat(100)
+                }))
+            };
+            
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(largeData)
+            });
+            
+            assert(response.ok, 'Large payload should be handled');
+        }, 'integration');
+
+        // ============================================================================
+        // Local Browser Tests (no server required)
+        // ============================================================================
+
+        runner.addTest('Browser fetch API exists', async () => {
+            assert(typeof fetch === 'function', 'fetch should be available');
+        }, 'browser');
+
+        runner.addTest('Browser Headers API exists', async () => {
+            const headers = new Headers({ 'X-Test': 'value' });
+            assertEqual(headers.get('X-Test'), 'value', 'Headers should work');
+        }, 'browser');
+
+        runner.addTest('Browser Request API exists', async () => {
+            const request = new Request('https://example.com', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ test: true })
+            });
+            assertEqual(request.method, 'POST', 'Request should be created');
+        }, 'browser');
+
+        runner.addTest('Browser Response API exists', async () => {
+            const response = new Response('Test', {
+                status: 200,
+                headers: { 'Content-Type': 'text/plain' }
+            });
+            assertEqual(response.status, 200, 'Response should be created');
+        }, 'browser');
+
+        runner.addTest('Browser Blob API exists', async () => {
+            const blob = new Blob(['Hello'], { type: 'text/plain' });
+            assert(blob.size > 0, 'Blob should be created');
+        }, 'browser');
+
+        runner.addTest('JSON parsing works', async () => {
+            const obj = { test: true, value: 42 };
+            const json = JSON.stringify(obj);
+            const parsed = JSON.parse(json);
+            assertEqual(parsed.test, true, 'JSON should parse correctly');
+        }, 'browser');
+
+        runner.addTest('URLSearchParams works', async () => {
+            const params = new URLSearchParams();
+            params.append('key', 'value');
+            assertEqual(params.get('key'), 'value', 'URLSearchParams should work');
+        }, 'browser');
+
+        // ============================================================================
+        // Test Runners
+        // ============================================================================
+
+        async function runAllTests() {
+            try {
+                getWebAppUrl(); // Validate URL is set
+                await runner.runAll();
+            } catch (error) {
+                alert(error.message);
+            }
+        }
+
+        async function runQuickTests() {
+            await runner.runQuick();
+        }
+    </script>
+</body>
+</html>
