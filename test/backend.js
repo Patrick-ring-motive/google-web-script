@@ -18,13 +18,12 @@
 Web.addEventListener('fetch', (request) => {
   try {
     const url = request.url || '';
-    const method = request.method || 'GET';
-    const path = request.parameter?.path || request.parameters?.path?.[0] || '/';
+    const rawPath = request.parameter?.path || request.parameters?.path?.[0] || '/';
+    const path = decodeURIComponent(rawPath);
     
     // Echo endpoint - returns request details
-    if (path === '/echo' || path === 'echo') {
+    if (/echo$/i.test(path)) {
       const requestData = {
-        method: method,
         url: url,
         headers: Object.fromEntries([...request.headers.entries()]),
         parameters: request.parameters || {},
@@ -54,7 +53,7 @@ Web.addEventListener('fetch', (request) => {
     }
     
     // JSON endpoint - returns JSON response
-    if (path === '/json' || path === 'json') {
+    if (/json$/i.test(path)) {
       return new Web.Response(JSON.stringify({ 
         message: 'Hello from Google Apps Script',
         timestamp: new Date().toISOString(),
@@ -66,7 +65,7 @@ Web.addEventListener('fetch', (request) => {
     }
     
     // POST endpoint - handles POST requests
-    if (path === '/post' || path === 'post') {
+    if (/post$/i.test(path)) {
       let receivedData = null;
       
       try {
@@ -95,7 +94,7 @@ Web.addEventListener('fetch', (request) => {
     }
     
     // FormData endpoint - handles multipart/form-data
-    if (path === '/formdata' || path === 'formdata') {
+    if (/formdata$/i.test(path)) {
       try {
         const formData = request.formData();
         const result = {};
@@ -136,7 +135,7 @@ Web.addEventListener('fetch', (request) => {
     }
     
     // Status code endpoint - returns specified status code
-    if (path.startsWith('/status/') || path.startsWith('status/')) {
+    if (/status\//i.test(path)) {
       const statusCode = parseInt(path.split('/').pop());
       if (statusCode >= 200 && statusCode < 600) {
         return new Web.Response(JSON.stringify({ 
@@ -150,7 +149,7 @@ Web.addEventListener('fetch', (request) => {
     }
     
     // Headers endpoint - returns request headers
-    if (path === '/headers' || path === 'headers') {
+    if (/headers$/i.test(path)) {
       const headers = {};
       for (const [key, value] of request.headers.entries()) {
         headers[key] = value;
@@ -180,12 +179,7 @@ Web.addEventListener('fetch', (request) => {
       timestamp: new Date().toISOString()
     }, null, 2), {
       status: 200,
-      headers: { 
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-      }
+      headers: { 'Content-Type': 'application/json' }
     });
     
   } catch (error) {

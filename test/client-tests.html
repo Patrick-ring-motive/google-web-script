@@ -506,20 +506,21 @@
         // ============================================================================
 
         runner.addTest('Basic GET request', async () => {
-            const url = getWebAppUrl();
+            const url = getWebAppUrl() + '?path=/json';
             const response = await fetch(url);
             assert(response.ok, 'Response should be ok');
         }, 'integration');
 
         runner.addTest('GET request returns JSON', async () => {
-            const url = getWebAppUrl();
+            const url = getWebAppUrl() + '?path=/json';
             const response = await fetch(url);
             const data = await response.json();
             assert(data, 'Should return JSON data');
+            assert(data.success === true, 'Should have success field');
         }, 'integration');
 
         runner.addTest('POST request with JSON body', async () => {
-            const url = getWebAppUrl();
+            const url = getWebAppUrl() + '?path=/post';
             const testData = { message: 'Hello from client', timestamp: Date.now() };
             
             const response = await fetch(url, {
@@ -529,47 +530,53 @@
             });
             
             assert(response.ok, 'POST should succeed');
+            const data = await response.json();
+            assert(data.message === 'POST received', 'Should receive POST confirmation');
         }, 'integration');
 
-        runner.addTest('Custom headers are received', async () => {
-            const url = getWebAppUrl();
+        runner.addTest('Echo endpoint reflects request', async () => {
+            const url = getWebAppUrl() + '?path=/echo';
             const response = await fetch(url, {
                 headers: { 'X-Custom-Header': 'test-value' }
             });
             
-            assert(response.ok, 'Request with custom header should succeed');
+            assert(response.ok, 'Request should succeed');
+            const data = await response.json();
+            assert(data.headers, 'Should return headers');
         }, 'integration');
 
-        runner.addTest('Query parameters are received', async () => {
-            const url = getWebAppUrl() + '?test=value&foo=bar';
+        runner.addTest('Headers endpoint returns request headers', async () => {
+            const url = getWebAppUrl() + '?path=/headers';
             const response = await fetch(url);
-            assert(response.ok, 'Request with query params should succeed');
+            assert(response.ok, 'Request should succeed');
+            const data = await response.json();
+            assert(data.headers, 'Should return headers object');
         }, 'integration');
 
-        runner.addTest('POST with form data', async () => {
-            const url = getWebAppUrl();
-            const formData = new URLSearchParams();
+        runner.addTest('FormData endpoint handles multipart data', async () => {
+            const url = getWebAppUrl() + '?path=/formdata';
+            const formData = new FormData();
             formData.append('field1', 'value1');
             formData.append('field2', 'value2');
             
             const response = await fetch(url, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                body: formData.toString()
+                body: formData
             });
             
-            assert(response.ok, 'POST with form data should succeed');
+            assert(response.ok, 'FormData POST should succeed');
+            const data = await response.json();
+            assert(data.fields, 'Should return fields object');
         }, 'integration');
 
-        runner.addTest('Response has correct content-type', async () => {
-            const url = getWebAppUrl();
+        runner.addTest('Status endpoint returns correct status code', async () => {
+            const url = getWebAppUrl() + '?path=/status/201';
             const response = await fetch(url);
-            const contentType = response.headers.get('content-type');
-            assert(contentType, 'Response should have content-type header');
+            assertEqual(response.status, 201, 'Should return status 201');
         }, 'integration');
 
         runner.addTest('Large JSON payload', async () => {
-            const url = getWebAppUrl();
+            const url = getWebAppUrl() + '?path=/post';
             const largeData = {
                 items: Array.from({ length: 100 }, (_, i) => ({
                     id: i,
