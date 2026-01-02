@@ -23,45 +23,67 @@ Web.addEventListener('fetch', (request) => {
     
     // Echo endpoint - returns request details
     if (/echo$/i.test(path)) {
-      const requestData = {
-        url: url,
-        headers: Object.fromEntries([...request.headers.entries()]),
-        parameters: request.parameters || {},
-        body: null
-      };
-      
-      // Try to parse body if present
       try {
-        const bodyText = request.text();
-        if (bodyText) {
-          requestData.body = bodyText;
-          // Try parsing as JSON
-          try {
-            requestData.bodyJson = JSON.parse(bodyText);
-          } catch (_) {
-            // Not JSON, that's fine
+        const requestData = {
+          url: url,
+          headers: Object.fromEntries([...request.headers.entries()]),
+          parameters: request.parameters || {},
+          body: null
+        };
+        
+        // Try to parse body if present
+        try {
+          const bodyText = request.text();
+          if (bodyText) {
+            requestData.body = bodyText;
+            // Try parsing as JSON
+            try {
+              requestData.bodyJson = JSON.parse(bodyText);
+            } catch (_) {
+              // Not JSON, that's fine
+            }
           }
+        } catch (_) {
+          // No body or can't read it
         }
-      } catch (_) {
-        // No body or can't read it
+        
+        return new Web.Response(JSON.stringify(requestData, null, 2), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      } catch (e) {
+        return new Web.Response(JSON.stringify({ 
+          error: 'Echo endpoint failed',
+          message: e.toString(),
+          stack: e.stack
+        }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
       }
-      
-      return new Web.Response(JSON.stringify(requestData, null, 2), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
     }
     
     // JSON endpoint - returns JSON response
     if (/json$/i.test(path)) {
-      return new Web.Response(JSON.stringify({ 
-        message: 'Hello from Google Apps Script',
-        timestamp: new Date().toISOString(),
-        success: true
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      try {
+        return new Web.Response(JSON.stringify({ 
+          message: 'Hello from Google Apps Script',
+          timestamp: new Date().toISOString(),
+          success: true
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      } catch (e) {
+        return new Web.Response(JSON.stringify({ 
+          error: 'JSON endpoint failed',
+          message: e.toString(),
+          stack: e.stack
+        }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
     }
     
     // POST endpoint - handles POST requests
@@ -136,13 +158,32 @@ Web.addEventListener('fetch', (request) => {
     
     // Status code endpoint - returns specified status code
     if (/status\//i.test(path)) {
-      const statusCode = parseInt(path.split('/').pop());
-      if (statusCode >= 200 && statusCode < 600) {
+      try {
+        const statusCode = parseInt(path.split('/').pop());
+        if (statusCode >= 200 && statusCode < 600) {
+          return new Web.Response(JSON.stringify({ 
+            status: statusCode,
+            message: 'Status code test'
+          }), {
+            status: statusCode,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } else {
+          return new Web.Response(JSON.stringify({ 
+            error: 'Invalid status code',
+            message: `Status code ${statusCode} is out of valid range (200-599)`
+          }), {
+            status: 400,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+      } catch (e) {
         return new Web.Response(JSON.stringify({ 
-          status: statusCode,
-          message: 'Status code test'
+          error: 'Status endpoint failed',
+          message: e.toString(),
+          stack: e.stack
         }), {
-          status: statusCode,
+          status: 500,
           headers: { 'Content-Type': 'application/json' }
         });
       }
@@ -150,18 +191,29 @@ Web.addEventListener('fetch', (request) => {
     
     // Headers endpoint - returns request headers
     if (/headers$/i.test(path)) {
-      const headers = {};
-      for (const [key, value] of request.headers.entries()) {
-        headers[key] = value;
+      try {
+        const headers = {};
+        for (const [key, value] of request.headers.entries()) {
+          headers[key] = value;
+        }
+        
+        return new Web.Response(JSON.stringify({ 
+          headers: headers,
+          timestamp: new Date().toISOString()
+        }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      } catch (e) {
+        return new Web.Response(JSON.stringify({ 
+          error: 'Headers endpoint failed',
+          message: e.toString(),
+          stack: e.stack
+        }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
       }
-      
-      return new Web.Response(JSON.stringify({ 
-        headers: headers,
-        timestamp: new Date().toISOString()
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
     }
     
     // Default response - API info

@@ -427,6 +427,11 @@
                     test.status = 'fail';
                     test.error = error.message;
                     this.results.failed++;
+                    
+                    // Log error to console for debugging
+                    console.error(`Test failed: ${test.name}`);
+                    console.error('Error:', error);
+                    
                     this.updateTestStatus(testEl, 'fail', error.message);
                 }
                 
@@ -529,7 +534,13 @@
                 body: JSON.stringify(testData)
             });
             
-            assert(response.ok, 'POST should succeed');
+            if (!response.ok) {
+                const errorBody = await response.text();
+                console.error('POST failed. Status:', response.status);
+                console.error('Response body:', errorBody);
+                throw new Error(`POST failed with status ${response.status}: ${errorBody}`);
+            }
+            
             const data = await response.json();
             assert(data.message === 'POST received', 'Should receive POST confirmation');
         }, 'integration');
@@ -564,7 +575,13 @@
                 body: formData
             });
             
-            assert(response.ok, 'FormData POST should succeed');
+            if (!response.ok) {
+                const errorBody = await response.text();
+                console.error('FormData POST failed. Status:', response.status);
+                console.error('Response body:', errorBody);
+                throw new Error(`FormData POST failed with status ${response.status}: ${errorBody}`);
+            }
+            
             const data = await response.json();
             assert(data.fields, 'Should return fields object');
         }, 'integration');
