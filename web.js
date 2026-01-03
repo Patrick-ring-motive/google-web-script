@@ -2288,14 +2288,15 @@
                     this['&fromString'](init);
                 }
             } else if (instanceOf(init, URLSearchParams)) {
-                const _this = this;
+                const $this = this;
                 init.forEach(function(value, name) {
-                    _this.append(name, value);
+                    $this.append(name, value);
                 });
             } else if ((init !== null) && (typeofInit === 'object')) {
                 if (isArray(init)) {
                     // Array of [name, value] pairs
-                    for (let i = 0; i !== init.length; ++i) {
+                    const initLength = init.length;
+                    for (let i = 0; i !== initLength; ++i) {
                         const entry = init[i];
                         if (isArray(entry) && entry.length === 2) {
                             this.append(entry[0], entry[1]);
@@ -2408,7 +2409,8 @@
             for (const name in this[$urlEntries]) {
                 if (this[$urlEntries].hasOwnProperty(name)) {
                     const values = this[$urlEntries][name];
-                    for (let i = 0; i !== values.length; ++i) {
+                    const valuesLength = values.length;
+                    for (let i = 0; i !== valuesLength; ++i) {
                         callback.call(thisArg, values[i], name, this);
                     }
                 }
@@ -2419,11 +2421,12 @@
          * Returns an iterator of [name, value] pairs
          * @returns {Iterator} Iterator of entries
          */
-        * entries() {
+         entries() {
             for (const name in this[$urlEntries]) {
                 if (this[$urlEntries].hasOwnProperty(name)) {
                     const values = this[$urlEntries][name];
-                    for (let i = 0; i !== values.length; ++i) {
+                    const valuesLength = values.length;
+                    for (let i = 0; i !== valuesLength; ++i) {
                         yield [name, values[i]];
                     }
                 }
@@ -2434,11 +2437,12 @@
          * Returns an iterator of parameter names
          * @returns {Iterator} Iterator of keys
          */
-        * keys() {
+         keys() {
             for (const name in this[$urlEntries]) {
                 if (this[$urlEntries].hasOwnProperty(name)) {
                     const values = this[$urlEntries][name];
-                    for (let i = 0; i !== values.length; ++i) {
+                    const valuesLength = values.length;
+                    for (let i = 0; i !== valueLength; ++i) {
                         yield name;
                     }
                 }
@@ -2449,11 +2453,12 @@
          * Returns an iterator of parameter values
          * @returns {Iterator} Iterator of values
          */
-        * values() {
+         values() {
             for (const name in this[$urlEntries]) {
                 if (this[$urlEntries].hasOwnProperty(name)) {
                     const values = this[$urlEntries][name];
-                    for (let i = 0; i !== values.length; ++i) {
+                    const valuesLength = values.length;
+                    for (let i = 0; i !== valuesLength; ++i) {
                         yield values[i];
                     }
                 }
@@ -2519,7 +2524,8 @@
             searchString = searchString.slice(1);
         }
         const pairs = searchString.split('&');
-        for (let i = 0; i !== pairs.length; ++i) {
+        const pairsLength = pairs.length;
+        for (let i = 0; i !== pairsLength; ++i) {
             const pair = pairs[i];
             const index = pair.indexOf('=');
             if (index > -1) {
@@ -2599,16 +2605,16 @@
             const searchParams = new Web.URLSearchParams(this[$search]);
             let enableSearchUpdate = true;
 
-            const _this = this;
-            ['append', 'delete', 'set', 'sort'].forEach(function(methodName) {
+            const $this = this;
+            for(const methodName of ['append', 'delete', 'set', 'sort']) {
                 const method = searchParams[methodName];
-                searchParams[methodName] = function() {
+                searchParams[methodName] = ()=> {
                     method.apply(searchParams, arguments);
                     if (enableSearchUpdate) {
-                        _this[$search] = searchParams.toString();
+                        $this[$search] = searchParams.toString();
                     }
                 };
-            });
+            };
 
             this[$searchParams] = searchParams;
             this[$updateSearchParams] = function() {
@@ -2975,7 +2981,7 @@
                         throw new TypeError('Cannot enqueue after close');
                     }
                     if (errored) {
-                        throw errored;
+                        returb console.warn(errored);
                     }
                     chunks.push(chunk);
                 },
@@ -3043,7 +3049,7 @@
          */
         cancel(reason) {
             if (this[$streamCancelled]) {
-                return Promise.resolve();
+                return;
             }
             this[$streamCancelled] = true;
             this[$streamController].controller.close();
@@ -3054,9 +3060,9 @@
                     this[$streamController].cancel(reason);
                 }
             } catch (err) {
-                return Promise.reject(err);
+                return console.warn(err);
             }
-            return Promise.resolve();
+            return;
         }
 
         /**
