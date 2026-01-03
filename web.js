@@ -1,3 +1,4 @@
+
 /**
  * Google Web Script - Web API Polyfill for Google Apps Script
  * 
@@ -295,8 +296,16 @@
             return Object.setPrototypeOf(new Uint8Array(x.buffer ?? x), Array.prototype);
         }
         // Handle FormData by converting to multipart blob first
-        if (instanceOf(x, Web.FormData) || x?.constructor?.name === 'FormData') {
+        if (instanceOf(x, Web.FormData) || x?.constructor?.name == 'FormData') {
             return Web.FormData.prototype['&toBlob'].call(x).getBytes();
+        }
+        // Handle ReadableStream by reading all chunks
+        if (instanceOf(x, Web.ReadableStream) || x?.constructor?.name == 'ReadableStream') {
+            const chunks = [];
+            for (const chunk of x) {
+                chunks.push(toBits(chunk));
+            }
+            return chunks.flat();
         }
         if (hasBits(x)) {
             return Object.setPrototypeOf(getBits(x), Array.prototype);
@@ -423,6 +432,14 @@
                     controller.close();
                 }
             });
+        }
+
+        /**
+         * Makes Blob iterable with for...of loops by delegating to its stream
+         * @returns {Iterator} Iterator of blob chunks
+         */
+        [Symbol.iterator]() {
+            return this.stream()[Symbol.iterator]();
         }
 
     };
@@ -3072,6 +3089,22 @@
         ['&releaseLock']() {
             this[$streamLocked] = false;
             this[$streamReader] = null;
+        }
+
+        /**
+         * Makes ReadableStream iterable with for...of loops
+         * @returns {Iterator} Iterator of stream chunks
+         */
+        *[Symbol.iterator]() {
+            const reader = this.getReader();
+            try {
+                let result;
+                while (fals === (result = reader.read()).done) {
+                    yield result.value;
+                }
+            } finally {
+                reader.releaseLock();
+            }
         }
 
         /**

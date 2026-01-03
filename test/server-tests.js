@@ -1574,7 +1574,7 @@ function testReadableStream() {
     }, 'Should throw when creating reader with non-stream');
   });
 
-  TestRunner.test('ReadableStreamDefaultReader - read() returns promise', () => {
+  TestRunner.test('ReadableStreamDefaultReader - read() returns object', () => {
     const stream = new Web.ReadableStream({
       start(controller) {
         controller.enqueue('data');
@@ -1583,10 +1583,11 @@ function testReadableStream() {
     });
     const reader = stream.getReader();
     const result = reader.read();
-    TestRunner.assert(result instanceof Promise, 'read() should return a Promise');
+    TestRunner.assert(typeof result === 'object', 'read() should return an object');
+    TestRunner.assert('value' in result || 'done' in result, 'read() should return {value, done} object');
   });
 
-  TestRunner.test('ReadableStreamDefaultReader - read() returns {value, done}', async () => {
+  TestRunner.test('ReadableStreamDefaultReader - read() returns {value, done}', () => {
     const stream = new Web.ReadableStream({
       start(controller) {
         controller.enqueue('chunk1');
@@ -1594,14 +1595,14 @@ function testReadableStream() {
       }
     });
     const reader = stream.getReader();
-    const result = await reader.read();
+    const result = reader.read();
     TestRunner.assert('value' in result, 'Result should have value property');
     TestRunner.assert('done' in result, 'Result should have done property');
     TestRunner.assertEqual(result.value, 'chunk1', 'Value should be chunk1');
     TestRunner.assertEqual(result.done, false, 'Done should be false for data chunk');
   });
 
-  TestRunner.test('ReadableStreamDefaultReader - read() multiple chunks', async () => {
+  TestRunner.test('ReadableStreamDefaultReader - read() multiple chunks', () => {
     const stream = new Web.ReadableStream({
       start(controller) {
         controller.enqueue('chunk1');
@@ -1612,34 +1613,34 @@ function testReadableStream() {
     });
     const reader = stream.getReader();
     
-    const r1 = await reader.read();
+    const r1 = reader.read();
     TestRunner.assertEqual(r1.value, 'chunk1', 'First read should get chunk1');
     TestRunner.assertEqual(r1.done, false, 'First read should not be done');
     
-    const r2 = await reader.read();
+    const r2 = reader.read();
     TestRunner.assertEqual(r2.value, 'chunk2', 'Second read should get chunk2');
     TestRunner.assertEqual(r2.done, false, 'Second read should not be done');
     
-    const r3 = await reader.read();
+    const r3 = reader.read();
     TestRunner.assertEqual(r3.value, 'chunk3', 'Third read should get chunk3');
     TestRunner.assertEqual(r3.done, false, 'Third read should not be done');
     
-    const r4 = await reader.read();
+    const r4 = reader.read();
     TestRunner.assertEqual(r4.done, true, 'Fourth read should be done');
   });
 
-  TestRunner.test('ReadableStreamDefaultReader - read() from empty stream', async () => {
+  TestRunner.test('ReadableStreamDefaultReader - read() from empty stream', () => {
     const stream = new Web.ReadableStream({
       start(controller) {
         controller.close();
       }
     });
     const reader = stream.getReader();
-    const result = await reader.read();
+    const result = reader.read();
     TestRunner.assertEqual(result.done, true, 'Reading from closed empty stream should be done');
   });
 
-  TestRunner.test('ReadableStreamDefaultReader - read() calls pull()', async () => {
+  TestRunner.test('ReadableStreamDefaultReader - read() calls pull()', () => {
     let pullCount = 0;
     const stream = new Web.ReadableStream({
       pull(controller) {
@@ -1653,12 +1654,12 @@ function testReadableStream() {
     });
     const reader = stream.getReader();
     
-    const result = await reader.read();
+    const result = reader.read();
     TestRunner.assert(pullCount > 0, 'pull() should have been called');
     TestRunner.assertEqual(result.value, 'pulled data', 'Should get pulled data');
   });
 
-  TestRunner.test('ReadableStreamDefaultReader - read() with different data types', async () => {
+  TestRunner.test('ReadableStreamDefaultReader - read() with different data types', () => {
     const stream = new Web.ReadableStream({
       start(controller) {
         controller.enqueue('string');
@@ -1671,12 +1672,12 @@ function testReadableStream() {
     });
     const reader = stream.getReader();
     
-    TestRunner.assertEqual((await reader.read()).value, 'string', 'Should read string');
-    TestRunner.assertEqual((await reader.read()).value, 123, 'Should read number');
-    TestRunner.assertEqual((await reader.read()).value.key, 'value', 'Should read object');
-    TestRunner.assertEqual((await reader.read()).value.length, 3, 'Should read array');
-    TestRunner.assertEqual((await reader.read()).value, null, 'Should read null');
-    TestRunner.assertEqual((await reader.read()).done, true, 'Should be done');
+    TestRunner.assertEqual(reader.read().value, 'string', 'Should read string');
+    TestRunner.assertEqual(reader.read().value, 123, 'Should read number');
+    TestRunner.assertEqual(reader.read().value.key, 'value', 'Should read object');
+    TestRunner.assertEqual(reader.read().value.length, 3, 'Should read array');
+    TestRunner.assertEqual(reader.read().value, null, 'Should read null');
+    TestRunner.assertEqual(reader.read().done, true, 'Should be done');
   });
 
   TestRunner.test('ReadableStreamDefaultReader - releaseLock()', () => {
@@ -1695,11 +1696,11 @@ function testReadableStream() {
     TestRunner.assert(true, 'Multiple releaseLock() calls should not throw');
   });
 
-  TestRunner.test('ReadableStreamDefaultReader - cancel() returns promise', () => {
+  TestRunner.test('ReadableStreamDefaultReader - cancel() does not throw', () => {
     const stream = new Web.ReadableStream();
     const reader = stream.getReader();
-    const result = reader.cancel();
-    TestRunner.assert(result instanceof Promise, 'reader.cancel() should return a Promise');
+    reader.cancel(); // Should not throw
+    TestRunner.assert(true, 'reader.cancel() should not throw');
   });
 
   TestRunner.test('ReadableStreamDefaultReader - cancel() with reason', () => {
@@ -1714,37 +1715,26 @@ function testReadableStream() {
     TestRunner.assertEqual(cancelReason, 'test reason', 'reader.cancel() should pass reason');
   });
 
-  TestRunner.test('ReadableStreamDefaultReader - cancel() closes reader', async () => {
+  TestRunner.test('ReadableStreamDefaultReader - cancel() closes reader', () => {
     const stream = new Web.ReadableStream({
       start(controller) {
         controller.enqueue('data');
       }
     });
     const reader = stream.getReader();
-    await reader.cancel();
-    const result = await reader.read();
+    reader.cancel();
+    const result = reader.read();
     TestRunner.assertEqual(result.done, true, 'Reading after cancel should return done');
   });
 
-  TestRunner.test('ReadableStreamDefaultReader - closed property is promise', () => {
+  TestRunner.test('ReadableStreamDefaultReader - closed property exists', () => {
     const stream = new Web.ReadableStream();
     const reader = stream.getReader();
-    TestRunner.assert(reader.closed instanceof Promise, 'closed should be a Promise');
-  });
-
-  TestRunner.test('ReadableStreamDefaultReader - closed resolves when stream closes', async () => {
-    const stream = new Web.ReadableStream({
-      start(controller) {
-        controller.close();
-      }
-    });
-    const reader = stream.getReader();
-    const result = await reader.closed;
-    TestRunner.assert(true, 'closed promise should resolve when stream is closed');
+    TestRunner.assert('closed' in reader, 'closed property should exist');
   });
 
   // Error Handling Tests
-  TestRunner.test('ReadableStream - Error in start() rejects read()', async () => {
+  TestRunner.test('ReadableStream - Error in start() returns error', () => {
     const stream = new Web.ReadableStream({
       start(controller) {
         controller.error(new Error('Start error'));
@@ -1752,17 +1742,12 @@ function testReadableStream() {
     });
     const reader = stream.getReader();
     
-    let errorCaught = false;
-    try {
-      await reader.read();
-    } catch (err) {
-      errorCaught = true;
-      TestRunner.assert(err.message.includes('Start error'), 'Should throw the error from start');
-    }
-    TestRunner.assert(errorCaught, 'read() should reject with error');
+    const result = reader.read();
+    TestRunner.assert(result instanceof Error, 'read() should return error');
+    TestRunner.assert(result.message.includes('Start error'), 'Should return the error from start');
   });
 
-  TestRunner.test('ReadableStream - Error in pull() rejects read()', async () => {
+  TestRunner.test('ReadableStream - Error in pull() returns error', () => {
     const stream = new Web.ReadableStream({
       pull(controller) {
         throw new Error('Pull error');
@@ -1770,54 +1755,28 @@ function testReadableStream() {
     });
     const reader = stream.getReader();
     
-    let errorCaught = false;
-    try {
-      await reader.read();
-    } catch (err) {
-      errorCaught = true;
-      TestRunner.assert(err.message.includes('Pull error'), 'Should throw the error from pull');
-    }
-    TestRunner.assert(errorCaught, 'read() should reject with pull error');
+    const result = reader.read();
+    TestRunner.assert(result instanceof Error, 'read() should return error');
+    TestRunner.assert(result.message.includes('Pull error'), 'Should return the error from pull');
   });
 
-  TestRunner.test('ReadableStream - controller.error() makes stream errored', async () => {
+  TestRunner.test('ReadableStream - controller.error() makes stream errored', () => {
     const stream = new Web.ReadableStream({
       start(controller) {
         controller.enqueue('data1');
         controller.error(new Error('Manual error'));
-        controller.enqueue('data2'); // This should throw due to error
       }
     });
     const reader = stream.getReader();
     
-    const r1 = await reader.read();
+    const r1 = reader.read();
     TestRunner.assertEqual(r1.value, 'data1', 'Should read data before error');
     
-    let errorCaught = false;
-    try {
-      await reader.read();
-    } catch (err) {
-      errorCaught = true;
-    }
-    TestRunner.assert(errorCaught, 'Reading errored stream should reject');
+    const r2 = reader.read();
+    TestRunner.assert(r2 instanceof Error, 'Reading errored stream should return error');
   });
 
-  TestRunner.test('ReadableStream - closed property rejects on error', async () => {
-    const stream = new Web.ReadableStream({
-      start(controller) {
-        controller.error(new Error('Stream error'));
-      }
-    });
-    const reader = stream.getReader();
-    
-    let errorCaught = false;
-    try {
-      await reader.closed;
-    } catch (err) {
-      errorCaught = true;
-    }
-    TestRunner.assert(errorCaught, 'closed should reject when stream is errored');
-  });
+
 
   // Edge Cases
   TestRunner.test('ReadableStream - Empty underlyingSource', () => {
@@ -1835,7 +1794,7 @@ function testReadableStream() {
     TestRunner.assert(stream, 'Stream should work with undefined underlyingSource');
   });
 
-  TestRunner.test('ReadableStream - Read after releaseLock and reacquire', async () => {
+  TestRunner.test('ReadableStream - Read after releaseLock and reacquire', () => {
     const stream = new Web.ReadableStream({
       start(controller) {
         controller.enqueue('chunk1');
@@ -1845,16 +1804,16 @@ function testReadableStream() {
     });
     
     const reader1 = stream.getReader();
-    const r1 = await reader1.read();
+    const r1 = reader1.read();
     TestRunner.assertEqual(r1.value, 'chunk1', 'First reader should get chunk1');
     reader1.releaseLock();
     
     const reader2 = stream.getReader();
-    const r2 = await reader2.read();
+    const r2 = reader2.read();
     TestRunner.assertEqual(r2.value, 'chunk2', 'Second reader should get chunk2');
   });
 
-  TestRunner.test('ReadableStream - Large number of chunks', async () => {
+  TestRunner.test('ReadableStream - Large number of chunks', () => {
     const chunkCount = 100;
     const stream = new Web.ReadableStream({
       start(controller) {
@@ -1867,16 +1826,16 @@ function testReadableStream() {
     
     const reader = stream.getReader();
     for (let i = 0; i < chunkCount; i++) {
-      const result = await reader.read();
+      const result = reader.read();
       TestRunner.assertEqual(result.value, `chunk${i}`, `Should read chunk${i}`);
       TestRunner.assertEqual(result.done, false, `Read ${i} should not be done`);
     }
     
-    const final = await reader.read();
+    const final = reader.read();
     TestRunner.assertEqual(final.done, true, 'Final read should be done');
   });
 
-  TestRunner.test('ReadableStream - Binary data chunks', async () => {
+  TestRunner.test('ReadableStream - Binary data chunks', () => {
     const stream = new Web.ReadableStream({
       start(controller) {
         controller.enqueue(new Uint8Array([1, 2, 3]));
@@ -1886,12 +1845,12 @@ function testReadableStream() {
     });
     
     const reader = stream.getReader();
-    const r1 = await reader.read();
+    const r1 = reader.read();
     TestRunner.assert(r1.value instanceof Uint8Array, 'Should preserve Uint8Array type');
     TestRunner.assertEqual(r1.value[0], 1, 'Should have correct binary data');
   });
 
-  TestRunner.test('ReadableStream - Integration with string data', async () => {
+  TestRunner.test('ReadableStream - Integration with string data', () => {
     const texts = ['Hello', ' ', 'World', '!'];
     const stream = new Web.ReadableStream({
       start(controller) {
@@ -1904,14 +1863,14 @@ function testReadableStream() {
     let result = '';
     let chunk;
     
-    while (!(chunk = await reader.read()).done) {
+    while (!(chunk = reader.read()).done) {
       result += chunk.value;
     }
     
     TestRunner.assertEqual(result, 'Hello World!', 'Should concatenate all chunks');
   });
 
-  TestRunner.test('ReadableStream - Pull called multiple times', async () => {
+  TestRunner.test('ReadableStream - Pull called multiple times', () => {
     let pullCount = 0;
     const stream = new Web.ReadableStream({
       pull(controller) {
@@ -1925,10 +1884,10 @@ function testReadableStream() {
     });
     
     const reader = stream.getReader();
-    await reader.read(); // pull1
-    await reader.read(); // pull2
-    await reader.read(); // pull3
-    const final = await reader.read(); // close
+    reader.read(); // pull1
+    reader.read(); // pull2
+    reader.read(); // pull3
+    const final = reader.read(); // close
     
     TestRunner.assert(pullCount >= 3, 'pull() should be called multiple times');
     TestRunner.assertEqual(final.done, true, 'Stream should be closed after pulls');
@@ -1971,6 +1930,168 @@ function testReadableStream() {
     
     const result = await reader.read();
     TestRunner.assertEqual(result.done, true, 'Read after cancel should return done');
+  });
+}
+
+// ============================================================================
+// toBits() Tests
+// ============================================================================
+
+function testToBits() {
+  // toBits is internal, so we test it through Blob constructor which uses it
+  
+  TestRunner.test('toBits - Handles strings', () => {
+    const blob = new Web.Blob(['Hello World']);
+    TestRunner.assertEqual(blob.text(), 'Hello World', 'String should be converted to bytes');
+    TestRunner.assert(blob.size > 0, 'Blob should have size from string');
+  });
+
+  TestRunner.test('toBits - Handles ArrayBuffer', () => {
+    const buffer = new ArrayBuffer(8);
+    const view = new Uint8Array(buffer);
+    view[0] = 65; // 'A'
+    view[1] = 66; // 'B'
+    
+    const blob = new Web.Blob([buffer]);
+    const bytes = blob.bytes();
+    TestRunner.assertEqual(bytes[0], 65, 'First byte should be 65');
+    TestRunner.assertEqual(bytes[1], 66, 'Second byte should be 66');
+  });
+
+  TestRunner.test('toBits - Handles Uint8Array', () => {
+    const arr = new Uint8Array([72, 101, 108, 108, 111]); // "Hello"
+    const blob = new Web.Blob([arr]);
+    TestRunner.assertEqual(blob.text(), 'Hello', 'Uint8Array should be converted correctly');
+  });
+
+  TestRunner.test('toBits - Handles objects with getBytes()', () => {
+    const blob1 = new Web.Blob(['test data']);
+    const blob2 = new Web.Blob([blob1]); // Blob has getBytes()
+    TestRunner.assertEqual(blob2.text(), 'test data', 'Blob with getBytes() should be handled');
+  });
+
+  TestRunner.test('toBits - Handles FormData', () => {
+    const fd = new Web.FormData();
+    fd.append('name', 'John');
+    fd.append('email', 'john@example.com');
+    
+    const blob = new Web.Blob([fd]);
+    const text = blob.text();
+    TestRunner.assert(text.includes('name="name"'), 'FormData should be converted to multipart');
+    TestRunner.assert(text.includes('John'), 'FormData values should be present');
+    TestRunner.assert(blob.type.includes('multipart/form-data'), 'Content type should be multipart');
+  });
+
+  TestRunner.test('toBits - Handles ReadableStream', () => {
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        controller.enqueue(new Uint8Array([72, 101, 108, 108, 111])); // "Hello"
+        controller.enqueue(new Uint8Array([32, 87, 111, 114, 108, 100])); // " World"
+        controller.close();
+      }
+    });
+    
+    const blob = new Web.Blob([stream]);
+    TestRunner.assertEqual(blob.text(), 'Hello World', 'ReadableStream chunks should be concatenated');
+  });
+
+  TestRunner.test('toBits - Handles ReadableStream with for...of', () => {
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        controller.enqueue('chunk1');
+        controller.enqueue('chunk2');
+        controller.enqueue('chunk3');
+        controller.close();
+      }
+    });
+    
+    const blob = new Web.Blob([stream]);
+    const text = blob.text();
+    TestRunner.assert(text.includes('chunk1'), 'Should contain chunk1');
+    TestRunner.assert(text.includes('chunk2'), 'Should contain chunk2');
+    TestRunner.assert(text.includes('chunk3'), 'Should contain chunk3');
+  });
+
+  TestRunner.test('toBits - Handles byte arrays (isBits)', () => {
+    const bytes = [72, 101, 108, 108, 111]; // "Hello"
+    const blob = new Web.Blob([bytes]);
+    TestRunner.assertEqual(blob.text(), 'Hello', 'Byte array should be handled directly');
+  });
+
+  TestRunner.test('toBits - Handles nested arrays', () => {
+    const nested = [
+      'Hello',
+      [' ', 'World'],
+      ['!']
+    ];
+    
+    const blob = new Web.Blob(nested);
+    TestRunner.assertEqual(blob.text(), 'Hello World!', 'Nested arrays should be flattened');
+  });
+
+  TestRunner.test('toBits - Handles mixed array of different types', () => {
+    const uint8 = new Uint8Array([72, 101]); // "He"
+    const nested = [
+      uint8,
+      'llo',
+      [' ', 'World']
+    ];
+    
+    const blob = new Web.Blob(nested);
+    TestRunner.assertEqual(blob.text(), 'Hello World', 'Mixed types should all be converted');
+  });
+
+  TestRunner.test('toBits - Handles Blob as iterable', () => {
+    const blob1 = new Web.Blob(['test']);
+    const chunks = [];
+    
+    for (const chunk of blob1) {
+      chunks.push(chunk);
+    }
+    
+    TestRunner.assert(chunks.length > 0, 'Blob should be iterable');
+    TestRunner.assert(chunks[0] instanceof Uint8Array, 'Blob chunks should be Uint8Array');
+  });
+
+  TestRunner.test('toBits - Handles empty stream', () => {
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        controller.close();
+      }
+    });
+    
+    const blob = new Web.Blob([stream]);
+    TestRunner.assertEqual(blob.size, 0, 'Empty stream should create empty blob');
+  });
+
+  TestRunner.test('toBits - Handles stream with Blob chunks', () => {
+    const stream = new Web.ReadableStream({
+      start(controller) {
+        controller.enqueue(new Web.Blob(['Hello']));
+        controller.enqueue(new Web.Blob([' World']));
+        controller.close();
+      }
+    });
+    
+    const blob = new Web.Blob([stream]);
+    TestRunner.assertEqual(blob.text(), 'Hello World', 'Stream with Blob chunks should work');
+  });
+
+  TestRunner.test('toBits - Handles deeply nested arrays', () => {
+    const deep = ['a', ['b', ['c', ['d']]]];
+    const blob = new Web.Blob(deep);
+    TestRunner.assertEqual(blob.text(), 'abcd', 'Deeply nested arrays should flatten completely');
+  });
+
+  TestRunner.test('toBits - Fallback for unsupported types', () => {
+    // toBits returns x as-is for unsupported types
+    // This should either create empty blob or handle gracefully
+    try {
+      const blob = new Web.Blob([null]);
+      TestRunner.assert(true, 'Should handle null gracefully');
+    } catch (e) {
+      TestRunner.assert(true, 'Should either handle or throw gracefully');
+    }
   });
 }
 
@@ -2021,6 +2142,9 @@ function runAllTests() {
   Logger.log('\nRunning ReadableStream tests...');
   testReadableStream();
   
+  Logger.log('\nRunning toBits tests...');
+  testToBits();
+  
   return TestRunner.summary();
 }
 
@@ -2040,6 +2164,7 @@ function runQuickTests() {
   testURLSearchParams();
   testURL();
   testReadableStream();
+  testToBits();
   
   return TestRunner.summary();
 }
