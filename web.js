@@ -2981,7 +2981,7 @@
                         throw new TypeError('Cannot enqueue after close');
                     }
                     if (errored) {
-                        returb console.warn(errored);
+                        return console.warn(errored);
                     }
                     chunks.push(chunk);
                 },
