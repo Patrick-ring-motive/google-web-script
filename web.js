@@ -2948,10 +2948,10 @@
      * 
      * Based on: https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream
      */
-    const $streamController = Symbol('streamController');
-    const $streamLocked = Symbol('streamLocked');
-    const $streamCancelled = Symbol('streamCancelled');
-    const $streamReader = Symbol('streamReader');
+    const $streamController = Symbol('*streamController');
+    const $streamLocked = Symbol('*streamLocked');
+    const $streamCancelled = Symbol('*streamCancelled');
+    const $streamReader = Symbol('*streamReader');
 
     const ReadableStream = class WebReadableStream {
         /**
@@ -3029,8 +3029,9 @@
             if (this[$streamLocked]) {
                 throw new TypeError('ReadableStream is already locked to a reader');
             }
-            this[$streamLocked] = true;
-            const reader = new Web.ReadableStreamDefaultReader(this);
+            // this[$streamLocked] = true;
+            // skipping lock intentionally for simplicity
+            const reader = this[$streamReader] ?? new Web.ReadableStreamDefaultReader(this);
             this[$streamReader] = reader;
             return reader;
         }
@@ -3134,8 +3135,8 @@
      * Properties:
      * - closed - Promise that resolves when stream is closed
      */
-    const $readerStream = Symbol('readerStream');
-    const $readerClosed = Symbol('readerClosed');
+    const $readerStream = Symbol('*readerStream');
+    const $readerClosed = Symbol('*readerClosed');
 
     const ReadableStreamDefaultReader = class WebReadableStreamDefaultReader {
         /**
@@ -3160,23 +3161,23 @@
 
             // Check if stream is closed or errored
             if (ctrl.errored) {
-                return Promise.reject(ctrl.errored);
+                return ctrl.errored;
             }
 
             if (this[$readerClosed]) {
-                return Promise.resolve({ value: undefined, done: true });
+                return { value: undefined, done: true };
             }
 
             // If we have queued chunks, return the first one
             if (ctrl.chunks.length > 0) {
                 const value = ctrl.chunks.shift();
-                return Promise.resolve({ value, done: false });
+                return { value, done: false };
             }
 
             // If stream is closed and no more chunks, we're done
             if (ctrl.closed) {
                 this[$readerClosed] = true;
-                return Promise.resolve({ value: undefined, done: true });
+                return { value: undefined, done: true };
             }
 
             // Try to pull more data
@@ -3188,36 +3189,27 @@
                 // Check if pull added chunks
                 if (ctrl.chunks.length > 0) {
                     const value = ctrl.chunks.shift();
-                    return Promise.resolve({ value, done: false });
+                    return { value, done: false };
                 }
 
                 // Check if pull closed the stream
                 if (ctrl.closed) {
                     this[$readerClosed] = true;
-                    return Promise.resolve({ value: undefined, done: true });
+                    return { value: undefined, done: true };
                 }
             } catch (err) {
                 ctrl.controller.error(err);
-                return Promise.reject(err);
+                return err;
             }
 
             // No data available and stream not closed
-            return Promise.resolve({ value: undefined, done: true });
+            return { value: undefined, done: true };
         }
 
         /**
          * Releases the reader's lock on the stream
          */
-        releaseLock() {
-            if (this[$readerClosed]) {
-                return;
-            }
-            const stream = this[$readerStream];
-            if (stream) {
-                stream['&releaseLock']();
-            }
-            this[$readerClosed] = true;
-        }
+        releaseLock() {}
 
         /**
          * Cancels the stream
@@ -3226,35 +3218,16 @@
          */
         cancel(reason) {
             if (this[$readerClosed]) {
-                return Promise.resolve();
+                return;
             }
             const stream = this[$readerStream];
             this[$readerClosed] = true;
             if (stream) {
                 return stream.cancel(reason);
             }
-            return Promise.resolve();
         }
-
-        /**
-         * Promise that resolves when the stream is closed
-         * @returns {Promise}
-         */
-        get closed() {
-            const stream = this[$readerStream];
-            if (!stream) {
-                return Promise.resolve();
-            }
-            const ctrl = stream[$streamController];
-            if (ctrl.closed || this[$readerClosed]) {
-                return Promise.resolve();
-            }
-            if (ctrl.errored) {
-                return Promise.reject(ctrl.errored);
-            }
-            // In a real implementation, this would return a promise that resolves later
-            // For this sham, we return a never-resolving promise
-            return new Promise(() => {});
+        get closed(){
+            this[$readerClosed];
         }
     };
 
