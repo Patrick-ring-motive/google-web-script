@@ -29,7 +29,7 @@ class URLSearchParams {
             if (init !== '') {
                 this['&fromString'](init);
             }
-        } else if (instanceOf(init,URLSearchParams)) {
+        } else if (instanceOf(init,Web.URLSearchParams)) {
             const $this = this;
             init.forEach((value, name)=>{
                 $this.append(name, value);
@@ -221,10 +221,10 @@ class URLSearchParams {
      */
     toString() {
         const pairs = [];
-        this.forEach((value, name)=> {
+        for([name,value] of this){
             // NOTE: This uses serializeParam helper that would need to be defined
             pairs.push(serializeParam(name) + '=' + serializeParam(value));
-        });
+        };
         return pairs.join('&');
     }
 
@@ -234,9 +234,9 @@ class URLSearchParams {
      */
     sort() {
         const entries = [];
-        this.forEach((value, name)=> {
+        for([name,value] of this) {
             entries.push([name, value]);
-        });
+        };
         entries.sort((a, b)=> {
             return a[0] < b[0] ? -1 : (a[0] > b[0] ? 1 : 0);
         });
@@ -657,7 +657,7 @@ FormData['&fromBlob'] = function fromBlob(blob) {
     const partsLength = parts.length - 1;
     for (let i = 1; i !== partsLength; ++i) {
         const part = parts[i];
-        if (!part.trim()) continue;
+        if (!part.trim?.()) continue;
         
         // Split headers from body at \r\n\r\n
         const headerBodySplit = part.indexOf('\r\n\r\n');
