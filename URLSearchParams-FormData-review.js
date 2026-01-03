@@ -25,22 +25,22 @@ class URLSearchParams {
 
         if (typeofInit === 'undefined') {
             // Empty URLSearchParams
-        } else if (typeofInit === 'string') {
+        } else if (isString(init)) {
             if (init !== '') {
                 this['&fromString'](init);
             }
-        } else if (init instanceof URLSearchParams) {
+        } else if (instanceOf(init,URLSearchParams)) {
             const $this = this;
-            init.forEach(function(value, name) {
+            init.forEach((value, name)=>{
                 $this.append(name, value);
             });
         } else if ((init !== null) && (typeofInit === 'object')) {
-            if (Array.isArray(init)) {
+            if (isArray(init)) {
                 // Array of [name, value] pairs
                 const initLength = init.length;
                 for (let i = 0; i !== initLength; ++i) {
                     const entry = init[i];
-                    if (Array.isArray(entry) && entry.length === 2) {
+                    if (isArray(entry) && entry.length === 2) {
                         this.append(entry[0], entry[1]);
                     } else {
                         throw new TypeError('Expected [string, any] as entry at index ' + i + ' of URLSearchParams\'s input');
@@ -68,8 +68,8 @@ class URLSearchParams {
         if (arguments.length < 2) {
             throw new TypeError('Failed to execute \'append\' on \'URLSearchParams\': 2 arguments required.');
         }
-        name = String(name);
-        value = String(value);
+        name = Str(name);
+        value = Str(value);
         if (name in this[$urlEntries]) {
             this[$urlEntries][name].push(value);
         } else {
@@ -85,7 +85,7 @@ class URLSearchParams {
         if (arguments.length < 1) {
             throw new TypeError('Failed to execute \'delete\' on \'URLSearchParams\': 1 argument required.');
         }
-        delete this[$urlEntries][String(name)];
+        delete this[$urlEntries][Str(name)];
     }
 
     /**
@@ -97,7 +97,7 @@ class URLSearchParams {
         if (arguments.length < 1) {
             throw new TypeError('Failed to execute \'get\' on \'URLSearchParams\': 1 argument required.');
         }
-        name = String(name);
+        name = Str(name);
         return (name in this[$urlEntries]) ? this[$urlEntries][name][0] : null;
     }
 
@@ -110,7 +110,7 @@ class URLSearchParams {
         if (arguments.length < 1) {
             throw new TypeError('Failed to execute \'getAll\' on \'URLSearchParams\': 1 argument required.');
         }
-        name = String(name);
+        name = Str(name);
         return (name in this[$urlEntries]) ? this[$urlEntries][name].slice(0) : [];
     }
 
@@ -123,7 +123,7 @@ class URLSearchParams {
         if (arguments.length < 1) {
             throw new TypeError('Failed to execute \'has\' on \'URLSearchParams\': 1 argument required.');
         }
-        return String(name) in this[$urlEntries];
+        return Str(name) in this[$urlEntries];
     }
 
     /**
@@ -135,8 +135,8 @@ class URLSearchParams {
         if (arguments.length < 2) {
             throw new TypeError('Failed to execute \'set\' on \'URLSearchParams\': 2 arguments required.');
         }
-        name = String(name);
-        this[$urlEntries][name] = [String(value)];
+        name = Str(name);
+        this[$urlEntries][name] = [Str(value)];
     }
 
     /**
@@ -184,7 +184,6 @@ class URLSearchParams {
             if (this[$urlEntries].hasOwnProperty(name)) {
                 const values = this[$urlEntries][name];
                 const valuesLength = values.length;
-                // BUG: This should be valuesLength, not valueLength (typo in web.js)
                 for (let i = 0; i !== valuesLength; ++i) {
                     yield name;
                 }
@@ -222,7 +221,7 @@ class URLSearchParams {
      */
     toString() {
         const pairs = [];
-        this.forEach(function(value, name) {
+        this.forEach((value, name)=> {
             // NOTE: This uses serializeParam helper that would need to be defined
             pairs.push(serializeParam(name) + '=' + serializeParam(value));
         });
@@ -235,14 +234,15 @@ class URLSearchParams {
      */
     sort() {
         const entries = [];
-        this.forEach(function(value, name) {
+        this.forEach((value, name)=> {
             entries.push([name, value]);
         });
-        entries.sort(function(a, b) {
+        entries.sort((a, b)=> {
             return a[0] < b[0] ? -1 : (a[0] > b[0] ? 1 : 0);
         });
         this[$urlEntries] = {};
-        for (let i = 0; i !== entries.length; ++i) {
+        const entriesLength = entries.length;
+        for (let i = 0; i !== entriesLength; ++i) {
             this.append(entries[i][0], entries[i][1]);
         }
     }
@@ -317,29 +317,29 @@ class FormData {
         }
 
         // Normalize the name to string (NOTE: Assumes Str() helper exists)
-        name = String(name);
+        name = Str(name);
 
         // Handle Blob/File values
         // NOTE: This references Web.Blob which would need to be available
-        if (value && (value instanceof Blob || value.getBytes)) {
+        if (value && (instanceOf(value, Web.Blob) || value.getBytes)) {
             // Determine filename
             filename = filename !== undefined
-                ? String(filename)
-                : typeof value.name === 'string'
+                ? Str(filename)
+                : isString(value.name)
                     ? value.name
                     : 'blob';
 
             // Ensure we have a Blob with the correct name
-            if (!(value instanceof Blob)) {
+            if (!instanceOf(value,Web.Blob)) {
                 // NOTE: Assumes Web.Blob constructor exists
-                value = new Blob(value);
+                value = new Web.Blob(value);
             }
 
             // Store as [name, blob, filename] tuple
             this[$entries].push([name, value, filename]);
         } else {
             // Store string value as [name, stringValue] tuple
-            this[$entries].push([name, String(value)]);
+            this[$entries].push([name, Str(value)]);
         }
     }
 
@@ -353,7 +353,7 @@ class FormData {
             throw new TypeError(`${1} argument required, but only ${arguments.length} present.`);
         }
 
-        name = String(name);
+        name = Str(name);
         this[$entries] = this[$entries].filter(entry => entry[0] !== name);
     }
 
@@ -368,7 +368,7 @@ class FormData {
             throw new TypeError(`${1} argument required, but only ${arguments.length} present.`);
         }
 
-        name = String(name);
+        name = Str(name);
         for (const entry of this[$entries]) {
             if (entry[0] === name) {
                 return entry[1];
@@ -388,7 +388,7 @@ class FormData {
             throw new TypeError(`${1} argument required, but only ${arguments.length} present.`);
         }
 
-        name = String(name);
+        name = Str(name);
         const result = [];
         for (const entry of this[$entries]) {
             if (entry[0] === name) {
@@ -409,7 +409,7 @@ class FormData {
             throw new TypeError(`${1} argument required, but only ${arguments.length} present.`);
         }
 
-        name = String(name);
+        name = Str(name);
         for (const entry of this[$entries]) {
             if (entry[0] === name) {
                 return true;
@@ -430,7 +430,7 @@ class FormData {
             throw new TypeError(`${2} argument required, but only ${arguments.length} present.`);
         }
 
-        name = String(name);
+        name = Str(name);
 
         // Find and replace first occurrence, remove others
         let replaced = false;
@@ -440,20 +440,20 @@ class FormData {
             if (entry[0] === name) {
                 if (!replaced) {
                     // Replace first occurrence
-                    if (value && (value instanceof Blob || value.getBytes)) {
+                    if (value && (instanceOf(value, Web.Blob) || value.getBytes)) {
                         filename = filename !== undefined
-                            ? String(filename)
-                            : typeof value.name === 'string'
+                            ? Str(filename)
+                            : isString(value.name)
                                 ? value.name
                                 : 'blob';
 
-                        if (!(value instanceof Blob)) {
-                            value = new Blob(value);
+                        if (!instanceOf(value, Web.Blob)) {
+                            value = new Web.Blob(value);
                         }
 
                         result.push([name, value, filename]);
                     } else {
-                        result.push([name, String(value)]);
+                        result.push([name, Str(value)]);
                     }
                     replaced = true;
                 }
@@ -465,20 +465,20 @@ class FormData {
 
         // If no replacement occurred, append
         if (!replaced) {
-            if (value && (value instanceof Blob || value.getBytes)) {
+            if (value && (instanceOf(value, Web.Blob) || value.getBytes)) {
                 filename = filename !== undefined
-                    ? String(filename)
-                    : typeof value.name === 'string'
+                    ? Str(filename)
+                    : isString(value.name)
                         ? value.name
                         : 'blob';
 
-                if (!(value instanceof Blob)) {
-                    value = new Blob(value);
+                if (!instanceOf(value, Web.Blob)) {
+                    value = new Web.Blob(value);
                 }
 
                 result.push([name, value, filename]);
             } else {
-                result.push([name, String(value)]);
+                result.push([name, Str(value)]);
             }
         }
 
@@ -590,14 +590,14 @@ FormData.prototype['&toBlob'] = function toBlob() {
         const value = entry[1];
         const filename = entry[2];
 
-        if (typeof value === 'string') {
+        if (isString(value)) {
             // String field
             chunks.push(prefix + escape(name) + `"\r\n\r\n${value.replace(/\r(?!\n)|(?<!\r)\n/g, '\r\n')}\r\n`);
         } else {
             // Blob/File field
             chunks.push(
                 prefix + escape(name) + `"; filename="${escape(filename, true)}"\r\n` +
-                `Content-Type: ${value.type || 'application/octet-stream'}\r\n\r\n`,
+                `Content-Type: ${Str(value.type || 'application/octet-stream')}\r\n\r\n`,
                 value,
                 '\r\n'
             );
@@ -608,7 +608,7 @@ FormData.prototype['&toBlob'] = function toBlob() {
     chunks.push(`--${boundary}--`);
 
     // Create blob with proper content type (NOTE: Assumes Blob constructor exists)
-    return new Blob(chunks, `multipart/form-data; boundary=${boundary}`);
+    return new Web.Blob(chunks, `multipart/form-data; boundary=${boundary}`);
 };
 
 /**
@@ -622,7 +622,7 @@ FormData.prototype['&toBlob'] = function toBlob() {
  * @returns {FormData} Parsed FormData instance
  */
 FormData['&fromBlob'] = function fromBlob(blob) {
-    const formData = new FormData();
+    const formData = new Web.FormData();
     
     // Get text content from blob
     const text = blob.text ? blob.text() : blob.getDataAsString();
@@ -684,7 +684,7 @@ FormData['&fromBlob'] = function fromBlob(blob) {
             const fileType = contentTypeMatch ? contentTypeMatch[1].trim() : 'application/octet-stream';
             
             // Create blob from body (NOTE: Assumes Blob constructor exists)
-            const fileBlob = new Blob([body], fileType);
+            const fileBlob = new Web.Blob([body], fileType);
             formData.append(name, fileBlob, filename);
         } else {
             // This is a text field
