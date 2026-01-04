@@ -552,6 +552,10 @@ class FormData {
         return '[object FormData]';
     }
 
+    get size(){
+        return this[$entries].length;
+    }
+
 }
 
 /**
