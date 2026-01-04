@@ -781,9 +781,16 @@
          * 
          * Note: Unlike browser FormData, we don't support constructing from HTML forms
          * since Google Apps Script doesn't have DOM access
+         * @param {string|Object|Array|URLSearchParams} init - Optional initial data
          */
-        constructor() {
+        constructor(init) {
             this[$entries] = [];
+            if (init) {
+                const params = new Web.URLSearchParams(init);
+                for (const [key, value] of params) {
+                    this.append(key, value);
+                }
+            }
         }
 
         /**
@@ -803,7 +810,7 @@
             name = Str(name);
 
             // Handle Blob/File values
-            if (value && (instanceOf(value,Web.Blob) || value.getBytes)) {
+            if (value && (instanceOf(value, Web.Blob) || value?.getBytes)) {
                 // Determine filename
                 filename = filename !== undefined
                     ? Str(filename)
@@ -1035,6 +1042,15 @@
             return '[object FormData]';
         }
 
+        /**
+         * Returns the number of entries in the FormData
+         * 
+         * @returns {number} Number of entries
+         */
+        get size() {
+            return this[$entries].length;
+        }
+
     };
 
     /**
@@ -1071,9 +1087,7 @@
 
             // Build multipart body
             for (const entry of this[$entries]) {
-                const name = entry[0];
-                const value = entry[1];
-                const filename = entry[2];
+                const [name, value, filename] = entry;
 
                 if (isString(value)) {
                     // String field
@@ -1082,7 +1096,7 @@
                     // Blob/File field
                     chunks.push(
                         prefix + escape(name) + `"; filename="${escape(filename, true)}"\r\n` +
-                        `Content-Type: ${value.type || 'application/octet-stream'}\r\n\r\n`,
+                        `Content-Type: ${Str(value.type || 'application/octet-stream')}\r\n\r\n`,
                         value,
                         '\r\n'
                     );
@@ -1118,7 +1132,7 @@
             const text = blob.text ? blob.text() : blob.getDataAsString();
             
             // Extract boundary from content type
-            const contentType = blob.type || blob.getContentType?.() || '';
+            const contentType = blob?.type || blob?.getContentType?.() || '';
             const boundaryMatch = contentType.match(/boundary=([^;]+)/);
             let boundary;
             
@@ -2285,6 +2299,9 @@
         return decodeURIComponent(String(value).replace(/\+/g, ' '));
     };
 
+    // Helper to check if object is Map-like (has iterator)
+    const isMapLike = x => instanceOf(x, Map) || x?.constructor?.name === 'Map' || ['Headers', 'FormData', 'URLSearchParams'].some(y => instanceOf(x, Web[y]) || x?.constructor?.name === y);
+
     // Private symbol for URLSearchParams entries storage
     const $urlEntries = Symbol('*urlEntries');
 
@@ -2294,7 +2311,7 @@
          * @param {string|Object|Array|URLSearchParams} init - Initial query parameters
          */
         constructor(init) {
-            this[$urlEntries] = {};
+            this[$urlEntries] = Object.create(null);
 
             const typeofInit = typeof init;
 
@@ -2304,11 +2321,11 @@
                 if (init !== '') {
                     this['&fromString'](init);
                 }
-            } else if (instanceOf(init, URLSearchParams)) {
+            } else if (isMapLike(init)) {
                 const $this = this;
-                init.forEach(function(value, name) {
+                for (const [name, value] of init) {
                     $this.append(name, value);
-                });
+                }
             } else if ((init !== null) && (typeofInit === 'object')) {
                 if (isArray(init)) {
                     // Array of [name, value] pairs
@@ -2438,7 +2455,7 @@
          * Returns an iterator of [name, value] pairs
          * @returns {Iterator} Iterator of entries
          */
-         entries() {
+         *entries() {
             for (const name in this[$urlEntries]) {
                 if (this[$urlEntries].hasOwnProperty(name)) {
                     const values = this[$urlEntries][name];
@@ -2454,12 +2471,12 @@
          * Returns an iterator of parameter names
          * @returns {Iterator} Iterator of keys
          */
-         keys() {
+         *keys() {
             for (const name in this[$urlEntries]) {
                 if (this[$urlEntries].hasOwnProperty(name)) {
                     const values = this[$urlEntries][name];
                     const valuesLength = values.length;
-                    for (let i = 0; i !== valueLength; ++i) {
+                    for (let i = 0; i !== valuesLength; ++i) {
                         yield name;
                     }
                 }
@@ -2470,7 +2487,7 @@
          * Returns an iterator of parameter values
          * @returns {Iterator} Iterator of values
          */
-         values() {
+         *values() {
             for (const name in this[$urlEntries]) {
                 if (this[$urlEntries].hasOwnProperty(name)) {
                     const values = this[$urlEntries][name];
@@ -2496,9 +2513,9 @@
          */
         toString() {
             const pairs = [];
-            this.forEach(function(value, name) {
+            for (const [name, value] of this) {
                 pairs.push(serializeParam(name) + '=' + serializeParam(value));
-            });
+            }
             return pairs.join('&');
         }
 
@@ -2508,15 +2525,16 @@
          */
         sort() {
             const entries = [];
-            this.forEach(function(value, name) {
+            for (const [name, value] of this) {
                 entries.push([name, value]);
+            }
+            entries.sort(([a], [b]) => {
+                return a < b ? -1 : (a > b ? 1 : 0);
             });
-            entries.sort(function(a, b) {
-                return a[0] < b[0] ? -1 : (a[0] > b[0] ? 1 : 0);
-            });
-            this[$urlEntries] = {};
-            for (let i = 0; i !== entries.length; ++i) {
-                this.append(entries[i][0], entries[i][1]);
+            this[$urlEntries] = Object.create(null);
+            const entriesLength = entries.length;
+            for (let i = 0; i !== entriesLength; ++i) {
+                this.append(...entries[i]);
             }
         }
 
@@ -2537,7 +2555,7 @@
 
     // Hidden method for parsing query strings
     setHidden(URLSearchParams.prototype, '&fromString', function fromString(searchString) {
-        if (searchString.charAt(0) === '?') {
+        if (searchString[0] === '?') {
             searchString = searchString.slice(1);
         }
         const pairs = searchString.split('&');
