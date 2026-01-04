@@ -2276,37 +2276,6 @@
     setProperty(Web, { removeEventListener });
 
  
-
-  /**
-     * Web.URLSearchParams - URLSearchParams API implementation
-     * 
-     * Provides an interface to work with URL query strings. Supports constructing
-     * from strings, objects, or iterables, and provides methods for manipulating
-     * query parameters.
-     * 
-     * Based on: https://github.com/lifaon74/url-polyfill
-     */
-
-    /**
-     * Serializes a parameter value for URL encoding
-     * Encodes according to application/x-www-form-urlencoded format
-     * Spaces become '+' instead of '%20'
-     */
-    const serializeParam = (value) => {
-        return encodeURIComponent(value).replace(/%20/g, '+');
-    };
-
-    /**
-     * Deserializes a parameter value from URL encoding
-     * '+' becomes space, then decodeURIComponent handles the rest
-     */
-    const deserializeParam = (value) => {
-        return decodeURIComponent(String(value).replace(/\+/g, ' '));
-    };
-
-    // Helper to check if object is Map-like (has iterator)
-    const isMapLike = x => instanceOf(x, Map) || x?.constructor?.name === 'Map' || ['Headers', 'FormData', 'URLSearchParams'].some(y => instanceOf(x, Web[y]) || x?.constructor?.name === y);
-
     // Private symbol for URLSearchParams entries storage
     const $urlEntries = Symbol('*urlEntries');
 
