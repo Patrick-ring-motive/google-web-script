@@ -321,6 +321,4 @@
 
     setProperty(Web, { ReadableStreamDefaultReader });
 
-    setProperty(Web, { removeEventListener });
-
-})();
+    
