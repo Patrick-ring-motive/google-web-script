@@ -11,6 +11,7 @@
 // ============================================================================
 
 // Private symbol for URLSearchParams entries storage
+const isMapLike = x => instanceOf(x,Map) || x?.constructor?.name == 'Map' || ['Headers','FormData','URLSearchParams'].some(y=>instanceOf(x,Web[y])||x?.constructor?.name == y);
 const $urlEntries = Symbol('*urlEntries');
 
 class URLSearchParams {
@@ -29,7 +30,7 @@ class URLSearchParams {
             if (init !== '') {
                 this['&fromString'](init);
             }
-        } else if (instanceOf(init,Web.URLSearchParams)) {
+        } else if (isMapLike(init)) {
             const $this = this;
             init.forEach((value, name)=>{
                 $this.append(name, value);
