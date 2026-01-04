@@ -250,13 +250,13 @@ class URLSearchParams {
         for(const[name,value] of this) {
             entries.push([name, value]);
         };
-        entries.sort((a, b)=> {
-            return a[0] < b[0] ? -1 : (a[0] > b[0] ? 1 : 0);
+        entries.sort(([a], [b])=> {
+            return a < b ? -1 : (a > b ? 1 : 0);
         });
         this[$urlEntries] = {};
         const entriesLength = entries.length;
         for (let i = 0; i !== entriesLength; ++i) {
-            this.append(entries[i][0], entries[i][1]);
+            this.append(...entries[i]);
         }
     }
 
@@ -364,7 +364,7 @@ class FormData {
      */
     delete(name) {
         name = Str(name);
-        this[$entries] = this[$entries].filter(entry => entry[0] !== name);
+        this[$entries] = this[$entries].filter([key] => key !== name);
     }
 
     /**
@@ -375,9 +375,9 @@ class FormData {
      */
     get(name) {
         name = Str(name);
-        for (const entry of this[$entries]) {
-            if (entry[0] === name) {
-                return entry[1];
+        for (const [key,value] of this[$entries]) {
+            if (key === name) {
+                return value;
             }
         }
     }
@@ -391,9 +391,9 @@ class FormData {
     getAll(name) {
         name = Str(name);
         const result = [];
-        for (const entry of this[$entries]) {
-            if (entry[0] === name) {
-                result.push(entry[1]);
+        for (const [key,value] of this[$entries]) {
+            if (key === name) {
+                result.push(value);
             }
         }
         return result;
@@ -407,8 +407,8 @@ class FormData {
      */
     has(name) {
         name = Str(name);
-        for (const entry of this[$entries]) {
-            if (entry[0] === name) {
+        for (const [key] of this[$entries]) {
+            if (key === name) {
                 return true;
             }
         }
@@ -429,12 +429,12 @@ class FormData {
         let replaced = false;
         const result = [];
 
-        for (const entry of this[$entries]) {
-            if (entry[0] === name) {
+        for (const [key] of this[$entries]) {
+            if (key === name) {
                 if (!replaced) {
                     // Replace first occurrence
                     if (value && (instanceOf(value, Web.Blob) || value.getBytes)) {
-                        filename = filename !== undefined
+                        filename = filename != undefined
                             ? Str(filename)
                             : isString(value.name)
                                 ? value.name
@@ -459,7 +459,7 @@ class FormData {
         // If no replacement occurred, append
         if (!replaced) {
             if (instanceOf(value, Web.Blob) || value?.getBytes) {
-                filename = filename !== undefined
+                filename = filename != undefined
                     ? Str(filename)
                     : isString(value.name)
                         ? value.name
@@ -484,9 +484,9 @@ class FormData {
      * @returns {Iterator} Iterator of [name, value] pairs
      */
     * entries() {
-        for (const entry of this[$entries]) {
+        for (const [key,value] of this[$entries]) {
             // Return as [name, value] (filename is internal)
-            yield [entry[0], entry[1]];
+            yield [key, value];
         }
     }
 
@@ -496,8 +496,8 @@ class FormData {
      * @returns {Iterator} Iterator of keys
      */
     * keys() {
-        for (const entry of this[$entries]) {
-            yield entry[0];
+        for (const [key] of this[$entries]) {
+            yield key;
         }
     }
 
@@ -507,8 +507,8 @@ class FormData {
      * @returns {Iterator} Iterator of values
      */
     * values() {
-        for (const entry of this[$entries]) {
-            yield entry[1];
+        for (const [key] of this[$entries]) {
+            yield key;
         }
     }
 
@@ -579,9 +579,7 @@ FormData.prototype['&toBlob'] = function toBlob() {
 
     // Build multipart body
     for (const entry of this[$entries]) {
-        const name = entry[0];
-        const value = entry[1];
-        const filename = entry[2];
+        const [name,value,filename] = entry;
 
         if (isString(value)) {
             // String field
