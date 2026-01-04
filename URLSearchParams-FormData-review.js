@@ -332,8 +332,14 @@ class FormData {
      * Note: Unlike browser FormData, we don't support constructing from HTML forms
      * since Google Apps Script doesn't have DOM access
      */
-    constructor() {
+    constructor(init) {
         this[$entries] = [];
+        if(init){
+              const params = new Web.URLSearchParams(init);
+              for(const[key,value] of params){
+                    this.append(key,value);
+              }
+        }
     }
 
     /**
