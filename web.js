@@ -1828,7 +1828,181 @@
 
     setProperty(Web, { Request });
 
-  
+      /**
+     * Default event object structure for web requests
+     * 
+     * This mirrors the shape of the event object that Google Apps Script passes
+     * to doGet(e) and doPost(e) functions when a web app receives an HTTP request.
+     * 
+     * See: https://developers.google.com/apps-script/guides/web#request_parameters
+     */
+    const defaultEvent = {
+        queryString: '',      // The query string portion of the URL (e.g., "?name=value&foo=bar")
+        parameter: {},        // Object with query/POST parameters as key-value pairs (first value if multiple)
+        parameters: {},       // Object with query/POST parameters as key-array pairs (all values)
+        pathInfo: '',         // Path after the web app URL (e.g., "/path/to/resource")
+        contextPath: '',      // Not currently used but part of the event structure
+        postData: {           // Present only for POST requests
+            contents: '',     // Request body as string
+            length: 0,        // Length of request body
+            type: 'text/plain', // Content-Type of request
+            name: 'postData'
+        },
+        contentLength: 0      // HTTP Content-Length header value
+    };
+
+    /**
+     * Web.RequestEvent - Represents the event object passed to doGet(e) and doPost(e)
+     * 
+     * WHY THIS EXISTS: When you create a Google Apps Script web app and deploy it,
+     * Google calls your doGet(e) or doPost(e) function with an event object containing
+     * the request details. This class extends Web.Request to provide a typed wrapper
+     * around that event object with Web API compatibility.
+     * 
+     * WHY EXTEND REQUEST: By extending Web.Request, RequestEvent gains all the Web API
+     * methods (.text(), .json(), .blob(), etc.) that pull data from the event's postData
+     * and parameters, making incoming requests work like outgoing Request objects.
+     * 
+     * Example usage:
+     *   function doGet(e) {
+     *     const event = new Web.RequestEvent(e);
+     *     const userId = event.parameter.userId;
+     *     const bodyText = event.text(); // Gets postData.contents
+     *     return ContentService.createTextOutput(JSON.stringify(event.parameters));
+     *   }
+     */
+    const RequestEvent = class WebRequestEvent extends Web.Request {
+
+        /**
+         * Creates a new RequestEvent from a doGet/doPost event object
+         * @param {Object} e - Event object passed to doGet(e) or doPost(e)
+         */
+        constructor(e = {}) {
+            e = Object.fromEntries(Object.entries(e || {}));
+            e.postData = Object.fromEntries(Object.entries(e.postData || {}));
+            // Merge with defaults
+            const eventData = {
+                ...defaultEvent,
+                ...e
+            };
+            
+            eventData.contentLength = Math.max(e.contentLength || 0, (e.postData?.length || 0));
+            (eventData.postData ?? {}).length = e.postData?.length || e.contentLength || 0;
+
+            // Build complete URL using ScriptApp.getService().getUrl() as base
+            let baseUrl = '';
+            try {
+                baseUrl = ScriptApp.getService().getUrl();
+            } catch (_) {
+                // ScriptApp not available or not a web app
+                baseUrl = '';
+            }
+            
+            const url = baseUrl + eventData.pathInfo + 
+                (eventData.queryString ? '?' + eventData.queryString : '');
+            
+            // Build headers from event data and ScriptApp properties using Web.Headers
+            // This ensures all headers are validated via isValidHeader before being set
+            const headers = new Web.Headers();
+            
+            // Content headers
+            if (eventData.postData?.type) {
+                headers.set('Content-Type', eventData.postData.type);
+            }
+            if (eventData.contentLength || eventData.postData?.length) {
+                headers.set('Content-Length', Str(eventData.contentLength || eventData.postData.length));
+            }
+            if (eventData.postData?.name) {
+                headers.set('Content-Name', eventData.postData.name);
+            }
+            
+            // ScriptApp metadata headers (safe access in case not available)
+            try {
+                headers.set('X-ScriptApp-Auth-Mode', Str(eventData.authMode ?? ScriptApp.AuthMode));
+                headers.set('X-ScriptApp-Authorization-Status', Str(eventData.authorizationStatus ?? ScriptApp.AuthorizationStatus));
+                headers.set('X-ScriptApp-Event-Type', Str(eventData.triggerSource ?? ScriptApp.TriggerSource));
+                headers.set('X-ScriptApp-WeekDay', Str(eventData.weekDay ?? ScriptApp.WeekDay));
+                if (ScriptApp.InstallationSource) {
+                    headers.set('X-ScriptApp-InstallationSource', Str(ScriptApp.InstallationSource));
+                }
+                // Get authorization info if authMode is available
+
+                try {
+                    const authInfo = ScriptApp.getAuthorizationInfo(eventData.authMode ?? ScriptApp.AuthMode);
+                    if (authInfo) {
+                        headers.set('X-ScriptApp-AuthorizationInfo', Str(authInfo.getAuthorizationStatus()));
+                    }
+                } catch (_) {
+                    // Authorization info not available
+                }
+        
+            } catch (_) {
+                // ScriptApp metadata not available
+            }
+            
+            // Call parent constructor with synthesized request data
+            super(url || '/', {
+                method: eventData.method || ((eventData.postData?.length>0) ? 'POST' : 'GET'),
+                headers: headers,
+                body: eventData.postData?.contents || ''
+            });
+            
+            // Add all event properties to this instance
+            Object.assign(this, eventData);
+
+            return Object.setPrototypeOf(this, Web.RequestEvent.prototype);
+        }
+
+        /**
+         * Gets request body as text from postData.contents
+         * @returns {string} Request body text
+         */
+        text() {
+            return this.postData?.contents || '';
+        }
+
+        /**
+         * Parses request body as JSON from postData.contents
+         * @returns {Object} Parsed JSON
+         */
+        json() {
+            const content = this.postData?.contents || '{}';
+            return JSON.parse(content);
+        }
+
+        /**
+         * Gets request body as Blob from postData.contents
+         * @returns {Web.Blob} Request body as Blob
+         */
+        blob() {
+            const content = this.postData?.contents || '';
+            // Check postData.type first, then headers as fallback
+            // postData.type should have boundary for multipart/form-data
+            const type = this.postData?.type || this.headers?.get?.('Content-Type') || 'text/plain';
+            return new Web.Blob(content, type);
+        }
+
+        /**
+         * Gets request body as Uint8Array from postData.contents
+         * @returns {Uint8Array} Byte array
+         */
+        bytes() {
+            const content = this.postData?.contents || '';
+            return new Uint8Array(Utilities.newBlob(content).getBytes());
+        }
+
+        /**
+         * Gets request body as ArrayBuffer from postData.contents
+         * @returns {ArrayBuffer} Array buffer
+         */
+        arrayBuffer() {
+            return this.bytes().buffer;
+        }
+
+    };
+
+    setProperty(Web, { RequestEvent });
+
 
 /**
      * Default options for fetch requests
