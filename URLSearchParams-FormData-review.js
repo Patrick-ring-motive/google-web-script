@@ -25,16 +25,12 @@ const tecodeComponent = x => {
         return recodeComponent(x);
       }
     };
-    
+    const toFormed = x => String.fromCodePoint(...new Web.Blob(x).bytes());
     const encodeComponent = x => {
       try {
         return encodeURIComponent(x);
       } catch {
-        try {
-          return encodeURIComponent(String(x).toWellFormed());
-        } catch {
-          return encodeURIComponent(decode(encode(String(x))));
-        }
+        return encodeURIComponent(toFormed(Str(x)));
       }
     };
 
