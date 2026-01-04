@@ -87,9 +87,7 @@ class URLSearchParams {
                     }
                 }
             }
-        } else {
-            throw new TypeError('Unsupported input\'s type for URLSearchParams');
-        }
+        } 
     }
 
     /**
@@ -98,9 +96,6 @@ class URLSearchParams {
      * @param {*} value - Parameter value
      */
     append(name, value) {
-        if (arguments.length < 2) {
-            throw new TypeError('Failed to execute \'append\' on \'URLSearchParams\': 2 arguments required.');
-        }
         name = Str(name);
         value = Str(value);
         if (name in this[$urlEntries]) {
@@ -115,9 +110,6 @@ class URLSearchParams {
      * @param {string} name - Parameter name to delete
      */
     delete(name) {
-        if (arguments.length < 1) {
-            throw new TypeError('Failed to execute \'delete\' on \'URLSearchParams\': 1 argument required.');
-        }
         delete this[$urlEntries][Str(name)];
     }
 
@@ -127,9 +119,6 @@ class URLSearchParams {
      * @returns {string|null} First value or null if not found
      */
     get(name) {
-        if (arguments.length < 1) {
-            throw new TypeError('Failed to execute \'get\' on \'URLSearchParams\': 1 argument required.');
-        }
         name = Str(name);
         return (name in this[$urlEntries]) ? this[$urlEntries][name][0] : null;
     }
@@ -140,9 +129,6 @@ class URLSearchParams {
      * @returns {Array<string>} Array of values
      */
     getAll(name) {
-        if (arguments.length < 1) {
-            throw new TypeError('Failed to execute \'getAll\' on \'URLSearchParams\': 1 argument required.');
-        }
         name = Str(name);
         return (name in this[$urlEntries]) ? this[$urlEntries][name].slice() : [];
     }
@@ -153,9 +139,6 @@ class URLSearchParams {
      * @returns {boolean} True if parameter exists
      */
     has(name) {
-        if (arguments.length < 1) {
-            throw new TypeError('Failed to execute \'has\' on \'URLSearchParams\': 1 argument required.');
-        }
         return Str(name) in this[$urlEntries];
     }
 
@@ -165,9 +148,6 @@ class URLSearchParams {
      * @param {*} value - Parameter value
      */
     set(name, value) {
-        if (arguments.length < 2) {
-            throw new TypeError('Failed to execute \'set\' on \'URLSearchParams\': 2 arguments required.');
-        }
         name = Str(name);
         this[$urlEntries][name] = [Str(value)];
     }
@@ -350,11 +330,6 @@ class FormData {
      * @param {string} filename - Optional filename for blob values
      */
     append(name, value, filename) {
-        // Validate arguments
-        if (arguments.length < 2) {
-            throw new TypeError(`${2} argument required, but only ${arguments.length} present.`);
-        }
-
         // Normalize the name to string (NOTE: Assumes Str() helper exists)
         name = Str(name);
 
@@ -388,10 +363,6 @@ class FormData {
      * @param {string} name - Field name to delete
      */
     delete(name) {
-        if (arguments.length < 1) {
-            throw new TypeError(`${1} argument required, but only ${arguments.length} present.`);
-        }
-
         name = Str(name);
         this[$entries] = this[$entries].filter(entry => entry[0] !== name);
     }
@@ -403,17 +374,12 @@ class FormData {
      * @returns {string|File|null} First value or null if not found
      */
     get(name) {
-        if (arguments.length < 1) {
-            throw new TypeError(`${1} argument required, but only ${arguments.length} present.`);
-        }
-
         name = Str(name);
         for (const entry of this[$entries]) {
             if (entry[0] === name) {
                 return entry[1];
             }
         }
-        return null;
     }
 
     /**
@@ -423,10 +389,6 @@ class FormData {
      * @returns {Array} Array of values
      */
     getAll(name) {
-        if (arguments.length < 1) {
-            throw new TypeError(`${1} argument required, but only ${arguments.length} present.`);
-        }
-
         name = Str(name);
         const result = [];
         for (const entry of this[$entries]) {
@@ -444,10 +406,6 @@ class FormData {
      * @returns {boolean} True if key exists
      */
     has(name) {
-        if (arguments.length < 1) {
-            throw new TypeError(`${1} argument required, but only ${arguments.length} present.`);
-        }
-
         name = Str(name);
         for (const entry of this[$entries]) {
             if (entry[0] === name) {
@@ -465,10 +423,6 @@ class FormData {
      * @param {string} filename - Optional filename for blob values
      */
     set(name, value, filename) {
-        if (arguments.length < 2) {
-            throw new TypeError(`${2} argument required, but only ${arguments.length} present.`);
-        }
-
         name = Str(name);
 
         // Find and replace first occurrence, remove others
@@ -565,10 +519,6 @@ class FormData {
      * @param {*} thisArg - Value to use as 'this' when executing callback
      */
     forEach(callback, thisArg) {
-        if (arguments.length < 1) {
-            throw new TypeError(`${1} argument required, but only ${arguments.length} present.`);
-        }
-
         for (const [name, value] of this.entries()) {
             callback.call(thisArg, value, name, this);
         }
