@@ -148,7 +148,7 @@
             const reader = this.getReader();
             try {
                 let result;
-                while (fals === (result = reader.read()).done) {
+                while (false === (result = reader.read()).done) {
                     yield result.value;
                 }
             } finally {
@@ -204,6 +204,12 @@
                     }
                 });
             }
+        }
+        tee(){
+            return [
+                Web.ReadablStream.from(new Web.ReadableStreamDefaultReader(this)),
+                Web.ReadablStream.from(new Web.ReadableStreamDefaultReader(this))
+            ];
         }
     };
 
