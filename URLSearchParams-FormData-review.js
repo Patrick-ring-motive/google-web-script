@@ -10,6 +10,17 @@
 // URLSearchParams Implementation
 // ============================================================================
 
+const serializeParam = (value) => {
+    return encodeURIComponent(Str(value)).replace(/%20/g, '+');
+};
+
+    /**
+     * Deserializes a parameter value from URL encoding
+     * '+' becomes space, then decodeURIComponent handles the rest
+     */
+const deserializeParam = (value) => {
+    return decodeURIComponent(Str(value).replace(/\+/g, ' '));
+};
 
 const isMapLike = x => instanceOf(x,Map) || x?.constructor?.name == 'Map' || ['Headers','FormData','URLSearchParams'].some(y=>instanceOf(x,Web[y])||x?.constructor?.name == y);
 // Private symbol for URLSearchParams entries storage
