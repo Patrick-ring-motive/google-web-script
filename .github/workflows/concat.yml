@@ -1,0 +1,41 @@
+name: Concatenate Files
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Skip if the last commit was made by the bot
+    if: github.event.head_commit.author.name != 'github-actions[bot]'
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Concatenate files
+        run: |
+          # Create output directory if it doesn't exist
+          mkdir -p dist
+          
+          # Concatenate files in order
+          cat web/web.js \
+              > web.js
+          
+          echo "Files concatenated successfully"
+      
+      - name: Commit and push if changed
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # Check if the output file changed
+          if git diff --quiet dist/bundle.txt; then
+            echo "No changes to output file, skipping commit"
+          else
+            git add dist/
+            git commit -m "Build: concatenate files [skip ci]"
+            git push
+          fi
