@@ -10,8 +10,36 @@
 // URLSearchParams Implementation
 // ============================================================================
 
+const tecodeComponent = x => {
+      try {
+        return decodeURIComponent(x);
+      } catch {
+        return Str(x);
+      }
+    };
+    const recodeComponent = x => Str(x).replace(/%[A-F0-9]{2}/g, tecodeComponent);
+    const decodeComponent = x => {
+      try {
+        return decodeURIComponent(x);
+      } catch {
+        return recodeComponent(x);
+      }
+    };
+    
+    const encodeComponent = x => {
+      try {
+        return encodeURIComponent(x);
+      } catch {
+        try {
+          return encodeURIComponent(String(x).toWellFormed());
+        } catch {
+          return encodeURIComponent(decode(encode(String(x))));
+        }
+      }
+    };
+
 const serializeParam = (value) => {
-    return encodeURIComponent(Str(value)).replace(/%20/g, '+');
+    return encodeComponent(Str(value)).replace(/%20/g, '+');
 };
 
     /**
@@ -19,7 +47,7 @@ const serializeParam = (value) => {
      * '+' becomes space, then decodeURIComponent handles the rest
      */
 const deserializeParam = (value) => {
-    return decodeURIComponent(Str(value).replace(/\+/g, ' '));
+    return decodeComponent(Str(value).replace(/\+/g, ' '));
 };
 
 const isMapLike = x => instanceOf(x,Map) || x?.constructor?.name == 'Map' || ['Headers','FormData','URLSearchParams'].some(y=>instanceOf(x,Web[y])||x?.constructor?.name == y);
