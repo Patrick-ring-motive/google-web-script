@@ -1,7 +1,7 @@
 
 /**
  * Google Web Script - Web API Polyfill for Google Apps Script
- * 
+ * afsd
  * This library provides Web-standard APIs (fetch, Blob, Headers, Request, Response)
  * for use in Google Apps Script environment by wrapping Google's native services.
  * 
