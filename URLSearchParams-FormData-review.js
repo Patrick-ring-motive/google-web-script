@@ -22,11 +22,10 @@ class URLSearchParams {
     constructor(init) {
         this[$urlEntries] = {};
 
-        const typeofInit = typeof init;
-
-        if (typeofInit === 'undefined') {
-            // Empty URLSearchParams
-        } else if (isString(init)) {
+        if (!init) {
+            return
+        }
+        if (isString(init)) {
             if (init !== '') {
                 this['&fromString'](init);
             }
