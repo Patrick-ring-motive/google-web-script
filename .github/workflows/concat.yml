@@ -33,6 +33,7 @@ jobs:
           if git diff --quiet web.js; then
             echo "No changes to output file, skipping commit"
           else
+            git add .
             git commit -m "Build: concatenate files [skip ci]"
             git push
           fi
