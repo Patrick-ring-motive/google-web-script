@@ -10,8 +10,9 @@
 // URLSearchParams Implementation
 // ============================================================================
 
-// Private symbol for URLSearchParams entries storage
+
 const isMapLike = x => instanceOf(x,Map) || x?.constructor?.name == 'Map' || ['Headers','FormData','URLSearchParams'].some(y=>instanceOf(x,Web[y])||x?.constructor?.name == y);
+// Private symbol for URLSearchParams entries storage
 const $urlEntries = Symbol('*urlEntries');
 
 class URLSearchParams {
@@ -20,21 +21,18 @@ class URLSearchParams {
      * @param {string|Object|Array|URLSearchParams} init - Initial query parameters
      */
     constructor(init) {
-        this[$urlEntries] = {};
+        this[$urlEntries] = Object.create(null);
 
         if (!init) {
             return
         }
         if (isString(init)) {
-            if (init !== '') {
-                this['&fromString'](init);
-            }
+            this['&fromString'](init);
         } else if (isMapLike(init)) {
-            const $this = this;
-            init.forEach((value, name)=>{
+            for(const [name,value] of init){
                 $this.append(name, value);
-            });
-        } else if ((init !== null) && (typeofInit === 'object')) {
+            };
+        } else if (typeof init === 'object') {
             if (isArray(init)) {
                 // Array of [name, value] pairs
                 const initLength = init.length;
@@ -111,7 +109,7 @@ class URLSearchParams {
             throw new TypeError('Failed to execute \'getAll\' on \'URLSearchParams\': 1 argument required.');
         }
         name = Str(name);
-        return (name in this[$urlEntries]) ? this[$urlEntries][name].slice(0) : [];
+        return (name in this[$urlEntries]) ? this[$urlEntries][name].slice() : [];
     }
 
     /**
@@ -221,7 +219,7 @@ class URLSearchParams {
      */
     toString() {
         const pairs = [];
-        for([name,value] of this){
+        for(const[name,value] of this){
             // NOTE: This uses serializeParam helper that would need to be defined
             pairs.push(serializeParam(name) + '=' + serializeParam(value));
         };
@@ -234,7 +232,7 @@ class URLSearchParams {
      */
     sort() {
         const entries = [];
-        for([name,value] of this) {
+        for(const[name,value] of this) {
             entries.push([name, value]);
         };
         entries.sort((a, b)=> {
@@ -264,8 +262,8 @@ class URLSearchParams {
 
 // Hidden method for parsing query strings (uses '&fromString' convention)
 URLSearchParams.prototype['&fromString'] = function fromString(searchString) {
-    if (searchString.charAt(0) === '?') {
-        searchString = searchString.slice(1);
+    if (searchString[0] === '?') {
+      searchString = searchString.slice(1);
     }
     const pairs = searchString.split('&');
     const pairsLength = pairs.length;
@@ -321,7 +319,7 @@ class FormData {
 
         // Handle Blob/File values
         // NOTE: This references Web.Blob which would need to be available
-        if (value && (instanceOf(value, Web.Blob) || value.getBytes)) {
+        if (instanceOf(value, Web.Blob) || value?.getBytes){
             // Determine filename
             filename = filename !== undefined
                 ? Str(filename)
@@ -465,7 +463,7 @@ class FormData {
 
         // If no replacement occurred, append
         if (!replaced) {
-            if (value && (instanceOf(value, Web.Blob) || value.getBytes)) {
+            if (instanceOf(value, Web.Blob) || value?.getBytes) {
                 filename = filename !== undefined
                     ? Str(filename)
                     : isString(value.name)
@@ -628,7 +626,7 @@ FormData['&fromBlob'] = function fromBlob(blob) {
     const text = blob.text ? blob.text() : blob.getDataAsString();
     
     // Extract boundary from content type
-    const contentType = blob.type || blob.getContentType?.() || '';
+    const contentType = blob?.type || blob?.getContentType?.() || '';
     const boundaryMatch = contentType.match(/boundary=([^;]+)/);
     let boundary;
     
