@@ -17,8 +17,6 @@ jobs:
       
       - name: Concatenate files
         run: |
-          # Create output directory if it doesn't exist
-          mkdir -p dist
           
           # Concatenate files in order
           cat web/web.js \
@@ -32,10 +30,9 @@ jobs:
           git config --local user.name "github-actions[bot]"
           
           # Check if the output file changed
-          if git diff --quiet dist/bundle.txt; then
+          if git diff --quiet web.js; then
             echo "No changes to output file, skipping commit"
           else
-            git add dist/
             git commit -m "Build: concatenate files [skip ci]"
             git push
           fi
