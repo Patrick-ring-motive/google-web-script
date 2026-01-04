@@ -1,10 +1,8 @@
 name: Concatenate Files
-
 on:
   push:
     branches:
       - main
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -17,10 +15,8 @@ jobs:
       
       - name: Concatenate files
         run: |
-          
-          # Concatenate files in order
-          cat web/web.js \
-              > web.js
+          # Concatenate all files in web/ directory in alphabetical order
+          cat web/* > web.js
           
           echo "Files concatenated successfully"
       
@@ -29,11 +25,13 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # Check if the output file changed
-          if git diff --quiet web.js; then
+          # Add the output file
+          git add web.js
+          
+          # Check if there are any changes (handles both new and modified files)
+          if git diff --cached --quiet; then
             echo "No changes to output file, skipping commit"
           else
-            git add .
             git commit -m "Build: concatenate files [skip ci]"
             git push
           fi
