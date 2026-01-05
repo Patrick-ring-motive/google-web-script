@@ -1,6 +1,6 @@
 /**
  * Google Web Script - Web API Polyfill for Google Apps Script
- * afsd
+ * 
  * This library provides Web-standard APIs (fetch, Blob, Headers, Request, Response)
  * for use in Google Apps Script environment by wrapping Google's native services.
  * 
@@ -363,6 +363,9 @@
      * Web.Blob - Web-compatible Blob implementation
      * Extends Google Apps Script's Utilities.newBlob with Web API methods
      * 
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/Blob (MDN Web Docs - Blob)
+     * @see https://developers.google.com/apps-script/reference/utilities/utilities#newBlob(Byte) (Google Apps Script - Utilities.newBlob)
+     * 
      * WHY EXTEND INSTEAD OF WRAP: We extend Utilities.newBlob directly because
      * UrlFetchApp and other Google APIs expect actual Blob objects, not wrappers.
      * By extending, our Web.Blob instances work seamlessly with all Google APIs
@@ -562,6 +565,9 @@
     /**
      * Web.Headers - HTTP Headers management with Web API compatibility
      * Implements case-insensitive header handling and cookie management
+     * 
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/Headers (MDN Web Docs - Headers)
+     * @see https://developers.google.com/apps-script/reference/url-fetch/url-fetch-app#fetchurl,-params (Google Apps Script - UrlFetchApp headers)
      * 
      * WHY PLAIN OBJECT STORAGE: UrlFetchApp.fetch() expects headers as a plain
      * JavaScript object like { 'Content-Type': 'application/json' }, NOT a Map
@@ -794,6 +800,9 @@
 
     /**
      * Web.FormData - FormData API implementation for Google Apps Script
+     * 
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/FormData (MDN Web Docs - FormData)
+     * @see https://developers.google.com/apps-script/reference/url-fetch/url-fetch-app#fetchurl,-params (Google Apps Script - UrlFetchApp payload)
      * 
      * WHY THIS EXISTS: Provides a standard Web API for constructing form data
      * that can be sent via UrlFetchApp. Unlike browser FormData which works
@@ -1257,6 +1266,10 @@
 
     /**
      * Web.Response - HTTP Response object with Web API compatibility
+     * 
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/Response (MDN Web Docs - Response)
+     * @see https://developers.google.com/apps-script/reference/content/content-service (Google Apps Script - ContentService)
+     * @see https://developers.google.com/apps-script/reference/url-fetch/http-response (Google Apps Script - HTTPResponse)
      */
     const Response = class WebResponse extends ContentService.createTextOutput{
 
@@ -1673,6 +1686,7 @@
 
             // Use HtmlService for XML/HTML content
             if(canParseXML(bodyText) || /xml|html/i.test(contentType)){
+                //needs it's own class
                 output = HtmlService.createHtmlOutput(bodyText);        
             }
             
@@ -1687,6 +1701,9 @@
     /**
      * Web.Request - HTTP Request object with Web API compatibility
      * Extends Google Apps Script's UrlFetchApp.getRequest
+     * 
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/Request (MDN Web Docs - Request)
+     * @see https://developers.google.com/apps-script/reference/url-fetch/url-fetch-app#getRequesturl,-params (Google Apps Script - UrlFetchApp.getRequest)
      * 
      * WHY EXTEND getRequest: This ties the APIs together and signals that instances
      * of Web.Request match or extend the type of object returned by getRequest().
@@ -1895,6 +1912,9 @@
     /**
      * Web.RequestEvent - Represents the event object passed to doGet(e) and doPost(e)
      * 
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/FetchEvent (MDN Web Docs - FetchEvent)
+     * @see https://developers.google.com/apps-script/guides/web#request_parameters (Google Apps Script - Web App Request Parameters)
+     * 
      * WHY THIS EXISTS: When you create a Google Apps Script web app and deploy it,
      * Google calls your doGet(e) or doPost(e) function with an event object containing
      * the request details. This class extends Web.Request to provide a typed wrapper
@@ -1997,6 +2017,8 @@
             // Add all event properties to this instance
             Object.assign(this, eventData);
 
+            this.handled = this.handled || false;
+
             return Object.setPrototypeOf(this, Web.RequestEvent.prototype);
         }
 
@@ -2086,6 +2108,9 @@
     /**
      * Web.fetch - Fetch API implementation using Google's UrlFetchApp
      * Makes HTTP requests with Web-standard API
+     * 
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/fetch (MDN Web Docs - fetch)
+     * @see https://developers.google.com/apps-script/reference/url-fetch/url-fetch-app#fetchurl,-params (Google Apps Script - UrlFetchApp.fetch)
      * 
      * WHY setPrototypeOf WITH UrlFetchApp.fetch: This links our fetch function's
      * prototype chain to UrlFetchApp.fetch, establishing type compatibility and
@@ -2191,9 +2216,10 @@
      * @returns {ContentService.TextOutput|HtmlService.HtmlOutput} Formatted output for Apps Script
      */
     const WebDo = function WebDo(request, handler) {
+        let req;
         try {
             // Convert to RequestEvent if not already
-            const req = instanceOf(request,Web.RequestEvent)
+            req = instanceOf(request,Web.RequestEvent)
                 ? request 
                 : new Web.RequestEvent(request);
             
@@ -2233,7 +2259,8 @@
                 headers: { 'Content-Type': 'application/json' }
             });
             
-            return new Web.ResponseEvent(defaultResponse);
+            const responseEvent = new Web.ResponseEvent(defaultResponse);
+            return responseEvent;
             
         } catch (error) {
             // Error handling - return error response
@@ -2247,6 +2274,8 @@
             });
             
             return new Web.ResponseEvent(errorResponse);
+        }finally{
+            req.handled = true;
         }
     };
 
@@ -2336,6 +2365,11 @@
    // Private symbol for URLSearchParams entries storage
     const $urlEntries = Symbol('*urlEntries');
 
+    /**
+     * Web.URLSearchParams - URLSearchParams API implementation
+     * 
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/URLSearchParams (MDN Web Docs - URLSearchParams)
+     */
     const URLSearchParams = class WebURLSearchParams {
         /**
          * Creates a new URLSearchParams object
@@ -2609,6 +2643,8 @@
 
     /**
      * Web.URL - URL API implementation
+     * 
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/URL (MDN Web Docs - URL)
      * 
      * Provides an interface to parse and construct URLs. This implementation
      * does not use DOM (document/anchor elements) since they're not available
@@ -3012,6 +3048,8 @@ Object.defineProperty(Web,'location',{
     /**
      * Web.ReadableStream - Basic synchronous ReadableStream implementation
      * 
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream (MDN Web Docs - ReadableStream)
+     * 
      * Provides a simplified ReadableStream API for synchronous chunk reading.
      * This is a "sham" implementation - not truly async/streaming, but provides
      * API compatibility for code that expects ReadableStream.
@@ -3027,8 +3065,6 @@ Object.defineProperty(Web,'location',{
      * - Chunks are stored in memory (no true backpressure)
      * - pull() is called synchronously during read()
      * - No support for byob readers or tee()
-     * 
-     * Based on: https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream
      */
     const $streamController = Symbol('*streamController');
     const $streamLocked = Symbol('*streamLocked');
@@ -3198,8 +3234,8 @@ Object.defineProperty(Web,'location',{
         tee(){
             const bits = toBits(this);
             return [
-                Web.ReadablStream.from(bits),
-                Web.ReadablStream.from(bits)
+                Web.ReadableStream.from(bits),
+                Web.ReadableStream.from(bits)
             ];
         }
     };
@@ -3319,4 +3355,6 @@ Object.defineProperty(Web,'location',{
     setProperty(Web, { ReadableStreamDefaultReader });
 
     
+
+
 })();
