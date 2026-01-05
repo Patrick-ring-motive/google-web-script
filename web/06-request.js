@@ -253,7 +253,7 @@
             // Build complete URL using ScriptApp.getService().getUrl() as base
             let baseUrl = '';
             try {
-                baseUrl = location;
+                baseUrl = Web.location.href;
             } catch (_) {
                 // ScriptApp not available or not a web app
                 baseUrl = '';
