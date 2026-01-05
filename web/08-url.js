@@ -665,13 +665,12 @@
     setProperty(Web, { Location });
 
 
-let $location;
+let _location;
 Object.defineProperty(Web,'location',{
    get(){
-      if($location){
-         return $location
+      if(!_location){
+         _location = new Location(ScriptAppService().getUrl());
       }
-      $location = ScriptAppService().getUrl();
-      return $location;
+      return _location;
    }
 });
