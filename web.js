@@ -425,7 +425,7 @@
          * @returns {string} MIME type
          */
         get type() {
-            return this.getContentType();
+            return this.getContentType()||'';
         }
 
         /**
