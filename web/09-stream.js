@@ -73,13 +73,18 @@
                 cancel: underlyingSource?.cancel
             };
 
-            // Call start() if provided
+                        // Call start() if provided
             try {
                 if (underlyingSource?.start) {
                     underlyingSource.start(controller);
                 }
             } catch (err) {
-                controller.error(err);
+                // Only call error() for errors that aren't about enqueue after close
+                if (err.message !== 'Cannot enqueue after close') {
+                    controller.error(err);
+                } else {
+                    throw err;
+                }
             }
         }
 
