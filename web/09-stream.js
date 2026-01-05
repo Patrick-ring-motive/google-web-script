@@ -1,4 +1,3 @@
-
     /**
      * Web.ReadableStream - Basic synchronous ReadableStream implementation
      * 
@@ -162,26 +161,7 @@
          * @returns {Web.ReadableStream} New ReadableStream
          */
         static from(iterable) {
-            // Check if it's an async iterable
-            const isAsync = iterable?.[Symbol.asyncIterator];
-            
-            if (isAsync) {
-                // Async iterable
-                return new Web.ReadableStream({
-                    async start(controller) {
-                        try {
-                            for await (const chunk of iterable) {
-                                controller.enqueue(chunk);
-                            }
-                            controller.close();
-                        } catch (err) {
-                            controller.error(err);
-                        }
-                    }
-                });
-            } else {
-                // Synchronous iterable
-                return new Web.ReadableStream({
+            return new Web.ReadableStream({
                     start(controller) {
                         try {
                             // Check if it has Symbol.iterator
@@ -203,12 +183,12 @@
                         }
                     }
                 });
-            }
         }
         tee(){
+            const bits = toBits(this);
             return [
-                Web.ReadablStream.from(new Web.ReadableStreamDefaultReader(this)),
-                Web.ReadablStream.from(new Web.ReadableStreamDefaultReader(this))
+                Web.ReadablStream.from(bits),
+                Web.ReadablStream.from(bits)
             ];
         }
     };
