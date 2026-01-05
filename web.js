@@ -404,6 +404,14 @@
             if (isString(parts)) {
                 return Object.setPrototypeOf(super(...blobArgs([parts, type, name])), Web.Blob.prototype);
             }
+            let part = parts;
+            if(isArray(parts) && len(parts)===1){
+                part = parts[0];
+            }
+
+            if (instanceOf(part, Web.FormData) || part?.constructor?.name == 'FormData') {
+                return Web.FormData.prototype['&toBlob'].call(part);
+            }
             
             // Convert to bytes and create blob
                 return Object.setPrototypeOf(super(...blobArgs([toBits(parts), type, name])), Web.Blob.prototype);
