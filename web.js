@@ -2972,6 +2972,18 @@
     };
 
     setProperty(Web, { Location });
+
+
+let $location;
+Object.defineProperty(Web,'location',{
+   get(){
+      if($location){
+         return $location
+      }
+      $location = ScriptApp.getService().getUrl();
+      return $location;
+   }
+});
     /**
      * Web.ReadableStream - Basic synchronous ReadableStream implementation
      * 
