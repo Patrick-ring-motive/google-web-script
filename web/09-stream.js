@@ -1,6 +1,8 @@
     /**
      * Web.ReadableStream - Basic synchronous ReadableStream implementation
      * 
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream (MDN Web Docs - ReadableStream)
+     * 
      * Provides a simplified ReadableStream API for synchronous chunk reading.
      * This is a "sham" implementation - not truly async/streaming, but provides
      * API compatibility for code that expects ReadableStream.
@@ -16,8 +18,6 @@
      * - Chunks are stored in memory (no true backpressure)
      * - pull() is called synchronously during read()
      * - No support for byob readers or tee()
-     * 
-     * Based on: https://developer.mozilla.org/en-US/docs/Web/API/ReadableStream
      */
     const $streamController = Symbol('*streamController');
     const $streamLocked = Symbol('*streamLocked');
@@ -187,8 +187,8 @@
         tee(){
             const bits = toBits(this);
             return [
-                Web.ReadablStream.from(bits),
-                Web.ReadablStream.from(bits)
+                Web.ReadableStream.from(bits),
+                Web.ReadableStream.from(bits)
             ];
         }
     };

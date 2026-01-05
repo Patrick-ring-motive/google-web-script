@@ -2,6 +2,9 @@
      * Web.Request - HTTP Request object with Web API compatibility
      * Extends Google Apps Script's UrlFetchApp.getRequest
      * 
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/Request (MDN Web Docs - Request)
+     * @see https://developers.google.com/apps-script/reference/url-fetch/url-fetch-app#getRequesturl,-params (Google Apps Script - UrlFetchApp.getRequest)
+     * 
      * WHY EXTEND getRequest: This ties the APIs together and signals that instances
      * of Web.Request match or extend the type of object returned by getRequest().
      * It's primarily for type compatibility and showing the relationship between
@@ -209,6 +212,9 @@
     /**
      * Web.RequestEvent - Represents the event object passed to doGet(e) and doPost(e)
      * 
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/FetchEvent (MDN Web Docs - FetchEvent)
+     * @see https://developers.google.com/apps-script/guides/web#request_parameters (Google Apps Script - Web App Request Parameters)
+     * 
      * WHY THIS EXISTS: When you create a Google Apps Script web app and deploy it,
      * Google calls your doGet(e) or doPost(e) function with an event object containing
      * the request details. This class extends Web.Request to provide a typed wrapper
@@ -310,6 +316,8 @@
             
             // Add all event properties to this instance
             Object.assign(this, eventData);
+
+            this.handled = this.handled || false;
 
             return Object.setPrototypeOf(this, Web.RequestEvent.prototype);
         }

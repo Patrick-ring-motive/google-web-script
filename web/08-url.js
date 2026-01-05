@@ -1,6 +1,11 @@
    // Private symbol for URLSearchParams entries storage
     const $urlEntries = Symbol('*urlEntries');
 
+    /**
+     * Web.URLSearchParams - URLSearchParams API implementation
+     * 
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/URLSearchParams (MDN Web Docs - URLSearchParams)
+     */
     const URLSearchParams = class WebURLSearchParams {
         /**
          * Creates a new URLSearchParams object
@@ -274,6 +279,8 @@
 
     /**
      * Web.URL - URL API implementation
+     * 
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/URL (MDN Web Docs - URL)
      * 
      * Provides an interface to parse and construct URLs. This implementation
      * does not use DOM (document/anchor elements) since they're not available

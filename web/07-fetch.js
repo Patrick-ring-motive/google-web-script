@@ -25,6 +25,9 @@
      * Web.fetch - Fetch API implementation using Google's UrlFetchApp
      * Makes HTTP requests with Web-standard API
      * 
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/fetch (MDN Web Docs - fetch)
+     * @see https://developers.google.com/apps-script/reference/url-fetch/url-fetch-app#fetchurl,-params (Google Apps Script - UrlFetchApp.fetch)
+     * 
      * WHY setPrototypeOf WITH UrlFetchApp.fetch: This links our fetch function's
      * prototype chain to UrlFetchApp.fetch, establishing type compatibility and
      * signaling that Web.fetch is an enhanced version of the underlying API.
@@ -129,9 +132,10 @@
      * @returns {ContentService.TextOutput|HtmlService.HtmlOutput} Formatted output for Apps Script
      */
     const WebDo = function WebDo(request, handler) {
+        let req;
         try {
             // Convert to RequestEvent if not already
-            const req = instanceOf(request,Web.RequestEvent)
+            req = instanceOf(request,Web.RequestEvent)
                 ? request 
                 : new Web.RequestEvent(request);
             
@@ -171,7 +175,8 @@
                 headers: { 'Content-Type': 'application/json' }
             });
             
-            return new Web.ResponseEvent(defaultResponse);
+            const responseEvent = new Web.ResponseEvent(defaultResponse);
+            return responseEvent;
             
         } catch (error) {
             // Error handling - return error response
@@ -185,6 +190,8 @@
             });
             
             return new Web.ResponseEvent(errorResponse);
+        }finally{
+            req.handled = true;
         }
     };
 

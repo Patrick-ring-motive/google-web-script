@@ -3,6 +3,9 @@
      * Web.Headers - HTTP Headers management with Web API compatibility
      * Implements case-insensitive header handling and cookie management
      * 
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/Headers (MDN Web Docs - Headers)
+     * @see https://developers.google.com/apps-script/reference/url-fetch/url-fetch-app#fetchurl,-params (Google Apps Script - UrlFetchApp headers)
+     * 
      * WHY PLAIN OBJECT STORAGE: UrlFetchApp.fetch() expects headers as a plain
      * JavaScript object like { 'Content-Type': 'application/json' }, NOT a Map
      * or specialized class instance. So we store headers directly as properties

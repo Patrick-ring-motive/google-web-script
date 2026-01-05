@@ -2,6 +2,9 @@
     /**
      * Web.FormData - FormData API implementation for Google Apps Script
      * 
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/FormData (MDN Web Docs - FormData)
+     * @see https://developers.google.com/apps-script/reference/url-fetch/url-fetch-app#fetchurl,-params (Google Apps Script - UrlFetchApp payload)
+     * 
      * WHY THIS EXISTS: Provides a standard Web API for constructing form data
      * that can be sent via UrlFetchApp. Unlike browser FormData which works
      * with File/Blob objects asynchronously, this implementation is synchronous

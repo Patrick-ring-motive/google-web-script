@@ -2,6 +2,9 @@
      * Web.Blob - Web-compatible Blob implementation
      * Extends Google Apps Script's Utilities.newBlob with Web API methods
      * 
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/Blob (MDN Web Docs - Blob)
+     * @see https://developers.google.com/apps-script/reference/utilities/utilities#newBlob(Byte) (Google Apps Script - Utilities.newBlob)
+     * 
      * WHY EXTEND INSTEAD OF WRAP: We extend Utilities.newBlob directly because
      * UrlFetchApp and other Google APIs expect actual Blob objects, not wrappers.
      * By extending, our Web.Blob instances work seamlessly with all Google APIs

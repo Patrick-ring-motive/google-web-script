@@ -11,6 +11,10 @@
 
     /**
      * Web.Response - HTTP Response object with Web API compatibility
+     * 
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/Response (MDN Web Docs - Response)
+     * @see https://developers.google.com/apps-script/reference/content/content-service (Google Apps Script - ContentService)
+     * @see https://developers.google.com/apps-script/reference/url-fetch/http-response (Google Apps Script - HTTPResponse)
      */
     const Response = class WebResponse extends ContentService.createTextOutput{
 
@@ -427,6 +431,7 @@
 
             // Use HtmlService for XML/HTML content
             if(canParseXML(bodyText) || /xml|html/i.test(contentType)){
+                //needs it's own class
                 output = HtmlService.createHtmlOutput(bodyText);        
             }
             
