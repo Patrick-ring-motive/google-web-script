@@ -26,12 +26,12 @@
     globalThis.Web = globalThis.Web || class Web {};
 
   const ScripAppService = (()=>{
-      let service;
+      let _service;
       return ()=>{
-        if(!service){
-          service = ScriptApp.getService();
+        if(!_service){
+          _service = ScriptApp.getService();
         }
-        return service; 
+        return _service; 
       };
   })();
     
