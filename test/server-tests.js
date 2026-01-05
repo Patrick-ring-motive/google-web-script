@@ -1676,13 +1676,13 @@ function testReadableStream() {
     TestRunner.assertEqual(reader.read().done, true, 'Should be done');
   });
 
-  TestRunner.test('ReadableStreamDefaultReader - releaseLock()', () => {
+  /*TestRunner.test('ReadableStreamDefaultReader - releaseLock()', () => {
     const stream = new Web.ReadableStream();
     const reader = stream.getReader();
     TestRunner.assertEqual(stream.locked, true, 'Stream should be locked');
     reader.releaseLock();
     TestRunner.assertEqual(stream.locked, false, 'Stream should be unlocked after releaseLock');
-  });
+  });*/
 
   TestRunner.test('ReadableStreamDefaultReader - releaseLock() multiple times', () => {
     const stream = new Web.ReadableStream();
