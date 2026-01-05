@@ -232,12 +232,12 @@
         if (type === 'fetch') {
             globalThis.doGet = function doGet(e) {
                 e.method = e?.method || e?.parameter?.method || 'GET';
-                return Web.do(e, handler);
+                return Web.do(e, handler) ?? e?.['&respondWith'];
             };
 
             globalThis.doPost = function doPost(e) {
                 e.method = e?.method || e?.parameter?.method || 'POST';
-                return Web.do(e, handler);
+                return Web.do(e, handler) ?? e?.['&respondWith'];
             };
         }
     };
