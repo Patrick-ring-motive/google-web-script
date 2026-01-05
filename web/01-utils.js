@@ -276,7 +276,7 @@
             return Utilities.newBlob(x).getBytes();
         }
         if (isBuffer(x) || hasBuffer(x)) {
-            return Object.setPrototypeOf(new Uint8Array(x.buffer ?? x), Array.prototype);
+            return [...new Uint8Array(x.buffer ?? x)];
         }
         // Handle FormData by converting to multipart blob first
         if (instanceOf(x, Web.FormData) || x?.constructor?.name == 'FormData') {
