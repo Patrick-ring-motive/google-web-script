@@ -1923,7 +1923,7 @@
             // Build complete URL using ScriptApp.getService().getUrl() as base
             let baseUrl = '';
             try {
-                baseUrl = ScriptApp.getService().getUrl();
+                baseUrl = location;
             } catch (_) {
                 // ScriptApp not available or not a web app
                 baseUrl = '';
@@ -2028,6 +2028,16 @@
          */
         arrayBuffer() {
             return this.bytes().buffer;
+        }
+
+        get request(){
+            return this
+        }
+
+        waitUntil(){}
+
+        respondWith(response){
+            setHidden(this,'&respondWith',response);
         }
 
     };
