@@ -20,7 +20,10 @@ const Cache = class WebCache{
     return new Web.Response(json.body,json);
   }
   put(key,value){
+    const keys = JSON.parse(ScriptCache().get(this[$cacheName] + 'keys') ?? '[]');
     key = this[$cacheName] + Str(key?.url ?? key);
+    keys.push(key);
+    ScriptCache().put(this[$cacheName] + 'keys',JSON.stringify(keys));
     return ScriptCache().put(key,JSON.stringify({
       headers:value?.headers,
       body:[...value?.bytes?.()??[]]
