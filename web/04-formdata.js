@@ -358,7 +358,7 @@
             chunks.push(`--${boundary}--`);
 
             // Create blob with proper content type
-            return new Web.Blob(chunks, `multipart/form-data; boundary=${boundary}`);
+            return new Web.Blob(chunks, {type: `multipart/form-data; boundary=${boundary}`});
     });
 
 
