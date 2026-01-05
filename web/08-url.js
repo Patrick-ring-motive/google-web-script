@@ -232,7 +232,7 @@
             entries.sort(([a], [b]) => {
                 return a < b ? -1 : (a > b ? 1 : 0);
             });
-            this[$urlEntries] = Object.create(null);
+            this[$urlEntries] = {};
             const entriesLength = entries.length;
             for (let i = 0; i !== entriesLength; ++i) {
                 this.append(...entries[i]);
