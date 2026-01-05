@@ -25,8 +25,18 @@
     // Initialize the global Web namespace if it doesn't exist
     globalThis.Web = globalThis.Web || class Web {};
 
+  const ScripAppService = (()=>{
+      let service;
+      return ()=>{
+        if(!service){
+          service = ScriptApp.getService();
+        }
+        return service; 
+      };
+  })();
+    
 
-    /**
+  /**
      * HTTP Status Code to Status Text mapping
      * Comprehensive list of status codes and their text descriptions
      * 
