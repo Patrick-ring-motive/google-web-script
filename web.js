@@ -2716,14 +2716,37 @@
             let enableSearchUpdate = true;
 
             const $this = this;
-            for(const methodName of ['append', 'delete', 'set', 'sort']) {
-                const method = searchParams[methodName];
-                searchParams[methodName] = ()=> {
-                    method.apply(searchParams, arguments);
-                    if (enableSearchUpdate) {
-                        $this[$search] = searchParams.toString();
-                    }
-                };
+            const originalAppend = searchParams.append;
+            const originalDelete = searchParams.delete;
+            const originalSet = searchParams.set;
+            const originalSort = searchParams.sort;
+            
+            searchParams.append = function(...args) {
+                originalAppend.apply(this, args);
+                if (enableSearchUpdate) {
+                    $this[$search] = this.toString();
+                }
+            };
+            
+            searchParams.delete = function(...args) {
+                originalDelete.apply(this, args);
+                if (enableSearchUpdate) {
+                    $this[$search] = this.toString();
+                }
+            };
+            
+            searchParams.set = function(...args) {
+                originalSet.apply(this, args);
+                if (enableSearchUpdate) {
+                    $this[$search] = this.toString();
+                }
+            };
+            
+            searchParams.sort = function(...args) {
+                originalSort.apply(this, args);
+                if (enableSearchUpdate) {
+                    $this[$search] = this.toString();
+                }
             };
 
             this[$searchParams] = searchParams;
@@ -2742,12 +2765,26 @@
          * @returns {string} Full URL
          */
         get href() {
-            return this.protocol + '//' +
-                (this.username ? (this.username + (this.password ? ':' + this.password : '') + '@') : '') +
-                this.host +
-                this.pathname +
-                (this.search ? '?' + this.search : '') +
-                (this.hash ? '#' + this.hash : '');
+            let result = this.protocol;
+            if (this.hostname) {
+                result += '//';
+                if (this.username) {
+                    result += this.username;
+                    if (this.password) {
+                        result += ':' + this.password;
+                    }
+                    result += '@';
+                }
+                result += this.host;
+            }
+            result += this.pathname;
+            if (this.search) {
+                result += '?' + this.search;
+            }
+            if (this.hash) {
+                result += '#' + this.hash;
+            }
+            return result;
         }
 
         set href(value) {
@@ -2772,7 +2809,7 @@
 
         set protocol(value) {
             this[$protocol] = String(value);
-            if (!this[$protocol].endsWith(':')) {
+            if (this[$protocol] && !this[$protocol].endsWith(':')) {
                 this[$protocol] += ':';
             }
         }
@@ -2892,8 +2929,14 @@
         const match = url.match(urlPattern);
         if (!match) return null;
 
+        let protocol = match[1] || (base ? base.protocol : '');
+        // Ensure protocol ends with colon
+        if (protocol && !protocol.endsWith(':')) {
+            protocol += ':';
+        }
+
         const result = {
-            protocol: match[1] || (base ? base.protocol : ''),
+            protocol: protocol,
             username: match[3] || '',
             password: match[4] || '',
             hostname: match[5] || (base ? base.hostname : ''),
