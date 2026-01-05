@@ -3331,19 +3331,20 @@ Object.defineProperty(Web,'location',{
             const stream = this[$readerStream];
             const ctrl = stream[$streamController];
 
-            // Check if stream is closed or errored
-            if (ctrl.errored) {
-                return ctrl.errored;
-            }
-
             if (this[$readerClosed]) {
                 return { value: undefined, done: true };
             }
 
-            // If we have queued chunks, return the first one
+            // If we have queued chunks, return the first one (even if errored, drain queue first)
             if (ctrl.chunks.length > 0) {
                 const value = ctrl.chunks.shift();
                 return { value, done: false };
+            }
+
+            // Check if stream is errored (after draining queue)
+            if (ctrl.errored) {
+                this[$readerClosed] = true;
+                return ctrl.errored;
             }
 
             // If stream is closed and no more chunks, we're done
