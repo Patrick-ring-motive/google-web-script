@@ -226,8 +226,14 @@
      *     return ContentService.createTextOutput(JSON.stringify(event.parameters));
      *   }
      */
+    let _clientId;
     const RequestEvent = class WebRequestEvent extends Web.Request {
-
+         get clientId(){
+             if(!_clientId){
+                 _clientId = ScriptApp.getScriptId();
+             }
+             return _clientId;
+         }
         /**
          * Creates a new RequestEvent from a doGet/doPost event object
          * @param {Object} e - Event object passed to doGet(e) or doPost(e)
