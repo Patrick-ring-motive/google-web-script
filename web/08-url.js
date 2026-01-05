@@ -671,7 +671,7 @@ Object.defineProperty(Web,'location',{
       if($location){
          return $location
       }
-      $location = ScriptApp.getService().getUrl();
+      $location = ScriptAppService().getUrl();
       return $location;
    }
 });
