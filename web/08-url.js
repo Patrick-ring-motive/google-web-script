@@ -12,7 +12,7 @@
          * @param {string|Object|Array|URLSearchParams} init - Initial query parameters
          */
         constructor(init) {
-            this[$urlEntries] = Object.create(null);
+            this[$urlEntries] = {};
 
             const typeofInit = typeof init;
 
