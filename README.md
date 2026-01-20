@@ -2,25 +2,50 @@
 
 A comprehensive Web API polyfill library for Google Apps Script that brings familiar browser-based fetch API and Web standards to the Google Apps Script environment, with bidirectional support for both outgoing HTTP requests and incoming web app handlers.
 
+## Quick Example
+
+```javascript
+// Create a web app with Service Worker-like API
+Web.addEventListener('fetch', (request) => {
+  const data = request.json();
+  
+  return new Web.Response(JSON.stringify({ 
+    echo: data,
+    timestamp: new Date().toISOString()
+  }), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+});
+
+// Or make outgoing HTTP requests
+const response = Web.fetch('https://api.example.com/data');
+const result = response.json();
+```
+
 ## Overview
 
 `google-web-script` provides a complete Web-compatible API layer on top of Google Apps Script's built-in services. It implements standard Web APIs like `fetch()`, `Blob`, `Headers`, `Request`, and `Response` by wrapping Google's `UrlFetchApp` and `Utilities` services with a modern, Web-standard interface.
 
+**Quick Start:** Use `Web.addEventListener('fetch', handler)` to create web apps with a Service Worker-like pattern, or use `Web.fetch()` to make HTTP requests.
+
 **What makes this library unique:**
+- **Service Worker-like API** - Use `addEventListener('fetch', handler)` to handle incoming requests with familiar patterns
 - **Synchronous by design** - Works naturally with Google Apps Script's synchronous execution model
-- **Bidirectional compatibility** - Use the same APIs for both making requests (fetch) and handling incoming requests (doGet/doPost)
+- **Bidirectional compatibility** - Use the same APIs for both making requests (fetch) and handling incoming requests
+- **Automatic handler setup** - No need to manually define `doGet()` or `doPost()` when using addEventListener
 - **Automatic header validation** - Prevents runtime errors from invalid headers
 - **Smart content-type detection** - Automatically infers content types when headers are missing
 - **Full Web API compatibility** - Write code that works like browser fetch while leveraging Google's infrastructure
 
 ## Features
 
-- **Web.fetch()** - Fetch API implementation using UrlFetchApp
-- **Web.Blob** - Web Blob API compatible with Google Apps Script
+- **Web.addEventListener('fetch', handler)** - Service Worker-like event listener for web apps (primary entrypoint)
+- **Web.fetch()** - Fetch API implementation for making HTTP requests using UrlFetchApp
+- **Web.Response** - Response objects with methods like `.json()`, `.text()`, `.blob()`, `.clone()`
+- **Web.Request** - Request objects with standard Web API interface and flexible constructors
 - **Web.Headers** - HTTP Headers management with case-insensitive handling and validation
 - **Web.FormData** - FormData API for constructing multipart/form-data requests
-- **Web.Request** - Request objects with standard Web API interface and flexible constructors
-- **Web.Response** - Response objects with methods like `.json()`, `.text()`, `.blob()`, `.clone()`
+- **Web.Blob** - Web Blob API compatible with Google Apps Script
 - **Web.RequestEvent** - Wraps doGet/doPost events with Web API methods
 - **Web.ResponseEvent** - Converts Web.Response to Apps Script-compatible output
 - **Web.do()** - Universal handler wrapper for doGet/doPost with automatic request/response conversion
@@ -35,21 +60,62 @@ Or add as a library using the Google Apps Script Library feature.
 
 ## Usage
 
-### Basic Fetch Request
+### Creating Web Apps with Fetch Listener (Primary Method)
+
+The recommended way to create a web app is using `Web.addEventListener('fetch', handler)`. This provides a familiar Service Worker-like API that automatically configures `doGet` and `doPost` handlers:
 
 ```javascript
+Web.addEventListener('fetch', (request) => {
+  // Parse incoming request
+  const path = request.pathInfo || '';
+  const method = request.method;
+  
+  // Route based on path and method
+  if (path === '/api/users' && method === 'GET') {
+    const users = [{ id: 1, name: 'John' }, { id: 2, name: 'Jane' }];
+    return new Web.Response(JSON.stringify(users), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+  
+  if (path === '/api/users' && method === 'POST') {
+    const userData = request.json();
+    return new Web.Response(JSON.stringify({ 
+      success: true,
+      received: userData 
+    }), {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
+  
+  // Default response
+  return new Web.Response('Not Found', { status: 404 });
+});
+```
+
+**Key benefits:**
+- No need to manually define `doGet()` or `doPost()` functions
+- Automatic request/response conversion
+- Service Worker-like API for familiar patterns
+- Single handler for all HTTP methods
+
+### Making Outgoing Fetch Requests
+
+Use `Web.fetch()` to make HTTP requests from your Apps Script:
+
+```javascript
+// Basic GET request
 const response = Web.fetch('https://api.example.com/data');
 const data = response.json();
 Logger.log(data);
-```
 
-### Fetch with Options
-
-```javascript
+// POST request with JSON body
 const response = Web.fetch('https://api.example.com/users', {
   method: 'POST',
   headers: {
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer token123'
   },
   body: JSON.stringify({ name: 'John Doe' })
 });
@@ -59,19 +125,12 @@ Logger.log(response.ok);
 const result = response.text();
 ```
 
-### Creating Web Apps with doGet/doPost
+### Alternative Web App Patterns
+
+If you need more control, you can use `Web.do()` or manual handlers:
 
 ```javascript
-// Simple handler using Web.do()
-function doGet(e) {
-  return Web.do(e);
-}
-
-function doPost(e) {
-  return Web.do(e);
-}
-
-// Custom handler with Web.do()
+// Pattern 1: Web.do() with inline handler
 function doGet(e) {
   return Web.do(e, (request) => {
     const userId = request.parameter.userId;
@@ -84,7 +143,12 @@ function doGet(e) {
   });
 }
 
-// Manual handling with RequestEvent and ResponseEvent
+// Pattern 2: Simple Web.do() wrapper (no custom logic)
+function doPost(e) {
+  return Web.do(e);
+}
+
+// Pattern 3: Manual handling with RequestEvent and ResponseEvent
 function doPost(e) {
   const request = new Web.RequestEvent(e);
   const body = request.json();
@@ -207,6 +271,43 @@ Logger.log(formData.has('email'));     // false
 ```
 
 ## API Reference
+
+### Web.addEventListener(type, handler)
+
+Sets up an event listener for the Web object. When the event type is `'fetch'`, it automatically configures `doGet()` and `doPost()` handlers on `globalThis`.
+
+**Parameters:**
+- `type` (String): Event type (currently supports `'fetch'`)
+- `handler` (Function): Handler function that receives a `Web.RequestEvent` and returns a `Web.Response`
+
+**Returns:** Nothing (configures global handlers as side effect)
+
+**Example:**
+```javascript
+Web.addEventListener('fetch', (request) => {
+  const path = request.pathInfo || '';
+  
+  if (path === '/hello') {
+    return new Web.Response('Hello, World!');
+  }
+  
+  return new Web.Response(JSON.stringify({ 
+    method: request.method,
+    path: path,
+    params: request.parameter 
+  }), {
+    headers: { 'Content-Type': 'application/json' }
+  });
+});
+
+// No need to define doGet() or doPost() - they're created automatically!
+```
+
+**Important Notes:**
+- Must be called at the top level of your script (not inside a function)
+- Automatically creates `globalThis.doGet` and `globalThis.doPost`
+- Don't define your own `doGet()` or `doPost()` after calling this
+- Mimics Service Worker fetch event pattern for familiarity
 
 ### Web.fetch(url, options)
 
@@ -442,13 +543,15 @@ The test/backend.js file provides test endpoints including:
 
 ## Use Cases
 
-- Making HTTP requests from Google Sheets, Docs, or Forms
-- Building REST API integrations
-- Creating web apps with familiar Web API syntax
-- Handling both incoming and outgoing HTTP in a unified way
-- Migrating browser-based code to Google Apps Script
-- Simplifying HTTP operations in Apps Script automation
-- Building webhook receivers with standard request handling
+- **Building web apps** with Service Worker-like `addEventListener('fetch', handler)` pattern
+- **Creating REST APIs** with familiar request/response objects and routing
+- **Making HTTP requests** from Google Sheets, Docs, or Forms
+- **Building webhook receivers** with standard request handling
+- **API integrations** with third-party services
+- **Handling incoming and outgoing HTTP** in a unified, Web-standard way
+- **Migrating browser-based code** to Google Apps Script with minimal changes
+- **Simplifying HTTP operations** in Apps Script automation
+- **Building serverless functions** with Google Apps Script infrastructure
 
 ## Limitations
 
