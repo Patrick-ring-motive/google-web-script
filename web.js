@@ -737,7 +737,7 @@ const Headers = class WebHeaders {
     append(key, value) {
         // Validate header before appending
         if (!isValidHeader(key, value)) {
-            return; // Skip invalid headers silently
+            key = `x-gas-${Str(key)}`;
         }
 
         key = Str(key).toLowerCase();
