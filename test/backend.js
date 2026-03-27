@@ -15,7 +15,7 @@
  */
 
 // Helper function to log to Google Drive spreadsheet
-const logToSheet = (()=>{
+const logToSheet = (() => {
   const memo = {};
 
   return function logToSheet(message, data) {
@@ -46,21 +46,25 @@ Web.addEventListener('fetch', (request) => {
     hasParameter: 'parameter' in request,
     hasParameters: 'parameters' in request,
   };
-  
+
   logToSheet('Request received', debugInfo);
-  
+
   try {
     const url = request.url || '';
     const rawPath = request.parameter?.path || request.parameters?.path?.[0] || '/';
     const path = decodeURIComponent(rawPath);
-    
+
     debugInfo.url = url;
     debugInfo.rawPath = rawPath;
     debugInfo.path = path;
     debugInfo.parameters = request.parameters;
-    
-    logToSheet('Processing path', { path, rawPath, parameters: request.parameters });
-    
+
+    logToSheet('Processing path', {
+      path,
+      rawPath,
+      parameters: request.parameters
+    });
+
     // Echo endpoint - returns request details
     if (/echo$/i.test(path)) {
       try {
@@ -70,7 +74,7 @@ Web.addEventListener('fetch', (request) => {
           parameters: request.parameters || {},
           body: null
         };
-        
+
         // Try to parse body if present
         try {
           const bodyText = request.text();
@@ -86,98 +90,125 @@ Web.addEventListener('fetch', (request) => {
         } catch (_) {
           // No body or can't read it
         }
-        
+
         return new Web.Response(JSON.stringify(requestData, null, 2), {
           status: 200,
-          headers: { 'Content-Type': 'application/json' }
+          headers: {
+            'Content-Type': 'application/json'
+          }
         });
       } catch (e) {
-        return new Web.Response(JSON.stringify({ 
+        return new Web.Response(JSON.stringify({
           error: 'Echo endpoint failed',
           message: e.toString(),
           stack: e.stack
         }), {
           status: 500,
-          headers: { 'Content-Type': 'application/json' }
+          headers: {
+            'Content-Type': 'application/json'
+          }
         });
       }
     }
-    
+
     // JSON endpoint - returns JSON response
     if (/json$/i.test(path)) {
       try {
-        return new Web.Response(JSON.stringify({ 
+        return new Web.Response(JSON.stringify({
           message: 'Hello from Google Apps Script',
           timestamp: new Date().toISOString(),
           success: true
         }), {
           status: 200,
-          headers: { 'Content-Type': 'application/json' }
+          headers: {
+            'Content-Type': 'application/json'
+          }
         });
       } catch (e) {
-        return new Web.Response(JSON.stringify({ 
+        return new Web.Response(JSON.stringify({
           error: 'JSON endpoint failed',
           message: e.toString(),
           stack: e.stack
         }), {
           status: 500,
-          headers: { 'Content-Type': 'application/json' }
+          headers: {
+            'Content-Type': 'application/json'
+          }
         });
       }
     }
-    
+
     // POST endpoint - handles POST requests
     if (/post$/i.test(path)) {
-      logToSheet('POST endpoint matched', { path });
+      logToSheet('POST endpoint matched', {
+        path
+      });
       debugInfo.endpointMatched = 'POST';
       let receivedData = null;
-      
+
       try {
         const bodyText = request.text();
         debugInfo.bodyLength = bodyText ? bodyText.length : 0;
         debugInfo.bodyPreview = bodyText ? bodyText.substring(0, 100) : null;
-        
-        logToSheet('POST body read', { bodyLength: debugInfo.bodyLength, bodyPreview: debugInfo.bodyPreview });
-        
+
+        logToSheet('POST body read', {
+          bodyLength: debugInfo.bodyLength,
+          bodyPreview: debugInfo.bodyPreview
+        });
+
         if (bodyText) {
           receivedData = JSON.parse(bodyText);
           debugInfo.parsedJSON = true;
-          logToSheet('POST JSON parsed', { keys: Object.keys(receivedData) });
+          logToSheet('POST JSON parsed', {
+            keys: Object.keys(receivedData)
+          });
         }
       } catch (e) {
         debugInfo.parseError = e.toString();
-        logToSheet('POST parse error', { error: e.toString(), stack: e.stack });
-        return new Web.Response(JSON.stringify({ 
+        logToSheet('POST parse error', {
+          error: e.toString(),
+          stack: e.stack
+        });
+        return new Web.Response(JSON.stringify({
           error: 'Invalid JSON in request body',
           message: e.toString(),
           debug: debugInfo
         }), {
           status: 400,
-          headers: { 'Content-Type': 'application/json' }
+          headers: {
+            'Content-Type': 'application/json'
+          }
         });
       }
-      
-      logToSheet('POST returning response', { receivedData });
-      const response = new Web.Response(JSON.stringify({ 
+
+      logToSheet('POST returning response', {
+        receivedData
+      });
+      const response = new Web.Response(JSON.stringify({
         message: 'POST received',
         received: receivedData,
         timestamp: new Date().toISOString(),
         debug: debugInfo
       }), {
         status: 200,
-        headers: { 'Content-Type': 'application/json' }
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
-      
-      logToSheet('POST response created', { responseType: typeof response, hasGetContent: typeof response?.getContent === 'function' });
+
+      logToSheet('POST response created', {
+        responseType: typeof response,
+        hasGetContent: typeof response?.getContent === 'function'
+      });
       return response;
     }
-    
+
     // FormData endpoint - handles multipart/form-data
     if (/formdata$/i.test(path)) {
       try {
         const formData = request.formData();
         const result = {};
-        
+
         // Extract all form fields
         for (const [name, value] of formData.entries()) {
           if (value && value.getBytes) {
@@ -193,59 +224,69 @@ Web.addEventListener('fetch', (request) => {
             result[name] = value;
           }
         }
-        
-        return new Web.Response(JSON.stringify({ 
+
+        return new Web.Response(JSON.stringify({
           message: 'FormData received',
           fields: result,
           timestamp: new Date().toISOString()
         }), {
           status: 200,
-          headers: { 'Content-Type': 'application/json' }
+          headers: {
+            'Content-Type': 'application/json'
+          }
         });
       } catch (e) {
-        return new Web.Response(JSON.stringify({ 
+        return new Web.Response(JSON.stringify({
           error: 'Failed to parse FormData',
           message: e.toString()
         }), {
           status: 400,
-          headers: { 'Content-Type': 'application/json' }
+          headers: {
+            'Content-Type': 'application/json'
+          }
         });
       }
     }
-    
+
     // Status code endpoint - returns specified status code
     if (/status\//i.test(path)) {
       try {
         const statusCode = parseInt(path.split('/').pop());
         if (statusCode >= 200 && statusCode < 600) {
-          return new Web.Response(JSON.stringify({ 
+          return new Web.Response(JSON.stringify({
             status: statusCode,
             message: 'Status code test'
           }), {
             status: statusCode,
-            headers: { 'Content-Type': 'application/json' }
+            headers: {
+              'Content-Type': 'application/json'
+            }
           });
         } else {
-          return new Web.Response(JSON.stringify({ 
+          return new Web.Response(JSON.stringify({
             error: 'Invalid status code',
             message: `Status code ${statusCode} is out of valid range (200-599)`
           }), {
             status: 400,
-            headers: { 'Content-Type': 'application/json' }
+            headers: {
+              'Content-Type': 'application/json'
+            }
           });
         }
       } catch (e) {
-        return new Web.Response(JSON.stringify({ 
+        return new Web.Response(JSON.stringify({
           error: 'Status endpoint failed',
           message: e.toString(),
           stack: e.stack
         }), {
           status: 500,
-          headers: { 'Content-Type': 'application/json' }
+          headers: {
+            'Content-Type': 'application/json'
+          }
         });
       }
     }
-    
+
     // Headers endpoint - returns request headers
     if (/headers$/i.test(path)) {
       try {
@@ -253,29 +294,35 @@ Web.addEventListener('fetch', (request) => {
         for (const [key, value] of request.headers.entries()) {
           headers[key] = value;
         }
-        
-        return new Web.Response(JSON.stringify({ 
+
+        return new Web.Response(JSON.stringify({
           headers: headers,
           timestamp: new Date().toISOString()
         }), {
           status: 200,
-          headers: { 'Content-Type': 'application/json' }
+          headers: {
+            'Content-Type': 'application/json'
+          }
         });
       } catch (e) {
-        return new Web.Response(JSON.stringify({ 
+        return new Web.Response(JSON.stringify({
           error: 'Headers endpoint failed',
           message: e.toString(),
           stack: e.stack
         }), {
           status: 500,
-          headers: { 'Content-Type': 'application/json' }
+          headers: {
+            'Content-Type': 'application/json'
+          }
         });
       }
     }
-    
+
     // Default response - API info
     debugInfo.endpointMatched = 'default';
-    logToSheet('No endpoint matched, returning default', { path });
+    logToSheet('No endpoint matched, returning default', {
+      path
+    });
     return new Web.Response(JSON.stringify({
       message: 'Google Web Script Test API',
       version: '1.0.0',
@@ -291,14 +338,20 @@ Web.addEventListener('fetch', (request) => {
       debug: debugInfo
     }, null, 2), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' }
+      headers: {
+        'Content-Type': 'application/json'
+      }
     });
-    
+
   } catch (error) {
     // Error handler
     debugInfo.topLevelError = error.toString();
     debugInfo.topLevelStack = error.stack;
-    logToSheet('Top-level error', { error: error.toString(), stack: error.stack, debugInfo });
+    logToSheet('Top-level error', {
+      error: error.toString(),
+      stack: error.stack,
+      debugInfo
+    });
     return new Web.Response(JSON.stringify({
       error: 'Internal Server Error',
       message: error.toString(),
@@ -306,7 +359,9 @@ Web.addEventListener('fetch', (request) => {
       debug: debugInfo
     }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: {
+        'Content-Type': 'application/json'
+      }
     });
   }
 });
@@ -322,42 +377,50 @@ Web.addEventListener('fetch', (request) => {
  */
 function testBackend() {
   Logger.log('Testing backend setup...');
-  
+
   // Test with a mock GET request
   const mockGetEvent = {
-    parameter: { path: '/json' },
-    parameters: { path: ['/json'] },
+    parameter: {
+      path: '/json'
+    },
+    parameters: {
+      path: ['/json']
+    },
     postData: {
       contents: '',
       length: 0,
       type: 'application/json'
     }
   };
-  
+
   const getResponse = doGet(mockGetEvent);
   Logger.log('GET Response type: ' + typeof getResponse);
   Logger.log('GET Response has getContent: ' + (typeof getResponse?.getContent === 'function'));
   if (getResponse && typeof getResponse.getContent === 'function') {
     Logger.log('GET Response content: ' + getResponse.getContent());
   }
-  
+
   // Test with a mock POST request
   const mockPostEvent = {
-    parameter: { path: '/post' },
-    parameters: { path: ['/post'] },
+    parameter: {
+      path: '/post'
+    },
+    parameters: {
+      path: ['/post']
+    },
     postData: {
       contents: '{"test": "data"}',
       length: 16,
       type: 'application/json'
     }
   };
-  
+
   const postResponse = doPost(mockPostEvent);
   Logger.log('POST Response type: ' + typeof postResponse);
   Logger.log('POST Response has getContent: ' + (typeof postResponse?.getContent === 'function'));
   if (postResponse && typeof postResponse.getContent === 'function') {
     Logger.log('POST Response content: ' + postResponse.getContent());
   }
-  
+
   Logger.log('Backend test complete!');
 }

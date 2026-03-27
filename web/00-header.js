@@ -24,4 +24,3 @@
 (() => {
     // Initialize the global Web namespace if it doesn't exist
     globalThis.Web = globalThis.Web || class Web {};
-

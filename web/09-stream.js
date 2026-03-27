@@ -25,180 +25,186 @@ const $streamCancelled = Symbol('*streamCancelled');
 const $streamReader = Symbol('*streamReader');
 
 const ReadableStream = class WebReadableStream {
-    /**
-     * Creates a new ReadableStream
-     * @param {Object} underlyingSource - Source object with optional start, pull, cancel methods
-     * @param {Object} strategy - Optional queuing strategy (ignored in this sham)
-     */
-    constructor(underlyingSource = {}, strategy = {}) {
-        this[$streamLocked] = false;
-        this[$streamCancelled] = false;
-        this[$streamReader] = null;
+  /**
+   * Creates a new ReadableStream
+   * @param {Object} underlyingSource - Source object with optional start, pull, cancel methods
+   * @param {Object} strategy - Optional queuing strategy (ignored in this sham)
+   */
+  constructor(underlyingSource = {}, strategy = {}) {
+    this[$streamLocked] = false;
+    this[$streamCancelled] = false;
+    this[$streamReader] = null;
 
-        // Create controller for the stream
-        const chunks = [];
-        let closed = false;
-        let errored = null;
+    // Create controller for the stream
+    const chunks = [];
+    let closed = false;
+    let errored = null;
 
-        const controller = {
-            enqueue: (chunk) => {
-                if (closed) {
-                    throw new TypeError('Cannot enqueue after close');
-                }
-                if (errored) {
-                    return console.warn(errored);
-                }
-                chunks.push(chunk);
-            },
-            close: () => {
-                closed = true;
-            },
-            error: (err) => {
-                errored = err;
-                closed = true;
-            },
-            get desiredSize() {
-                if (closed) return null;
-                return 1; // Simplified - always ready for more
-            }
-        };
+    const controller = {
+      enqueue: (chunk) => {
+        if (closed) {
+          throw new TypeError('Cannot enqueue after close');
+        }
+        if (errored) {
+          return console.warn(errored);
+        }
+        chunks.push(chunk);
+      },
+      close: () => {
+        closed = true;
+      },
+      error: (err) => {
+        errored = err;
+        closed = true;
+      },
+      get desiredSize() {
+        if (closed) return null;
+        return 1; // Simplified - always ready for more
+      }
+    };
 
-        this[$streamController] = {
-            chunks,
-            get closed() { return closed; },
-            get errored() { return errored; },
-            controller,
-            underlyingSource: underlyingSource || {},
-            pull: underlyingSource?.pull,
-            cancel: underlyingSource?.cancel
-        };
+    this[$streamController] = {
+      chunks,
+      get closed() {
+        return closed;
+      },
+      get errored() {
+        return errored;
+      },
+      controller,
+      underlyingSource: underlyingSource || {},
+      pull: underlyingSource?.pull,
+      cancel: underlyingSource?.cancel
+    };
 
-        // Call start() if provided
+    // Call start() if provided
+    try {
+      if (underlyingSource?.start) {
+        underlyingSource.start(controller);
+      }
+    } catch (err) {
+      // Only call error() for errors that aren't about enqueue after close
+      if (err.message !== 'Cannot enqueue after close') {
+        controller.error(err);
+      } else {
+        throw err;
+      }
+    }
+  }
+
+  /**
+   * Gets whether the stream is locked to a reader
+   * @returns {boolean}
+   */
+  get locked() {
+    return this[$streamLocked];
+  }
+
+  /**
+   * Gets a reader for the stream
+   * @param {Object} options - Optional reader options (mode not supported in sham)
+   * @returns {ReadableStreamDefaultReader}
+   */
+  getReader(options = {}) {
+    if (this[$streamLocked]) {
+      throw new TypeError('ReadableStream is already locked to a reader');
+    }
+    // this[$streamLocked] = true;
+    // skipping lock intentionally for simplicity
+    const reader = this[$streamReader] ?? new Web.ReadableStreamDefaultReader(this);
+    this[$streamReader] = reader;
+    return reader;
+  }
+
+  /**
+   * Cancels the stream
+   * @param {*} reason - Reason for cancellation
+   * @returns {Promise}
+   */
+  cancel(reason) {
+    if (this[$streamCancelled]) {
+      return;
+    }
+    this[$streamCancelled] = true;
+    this[$streamController].controller.close();
+
+    // Call cancel on underlying source if provided
+    try {
+      if (this[$streamController].cancel) {
+        this[$streamController].cancel(reason);
+      }
+    } catch (err) {
+      return console.warn(err);
+    }
+    return;
+  }
+
+  /**
+   * Internal method to release the reader lock
+   * @private
+   */
+  ['&releaseLock']() {
+    this[$streamLocked] = false;
+    this[$streamReader] = null;
+  }
+
+  /**
+   * Makes ReadableStream iterable with for...of loops
+   * @returns {Iterator} Iterator of stream chunks
+   */
+  *[Symbol.iterator]() {
+    const reader = this.getReader();
+    try {
+      let result;
+      while (false === (result = reader.read()).done) {
+        yield result.value;
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  }
+
+  /**
+   * Creates a ReadableStream from an iterable or async iterable
+   * @param {Iterable|AsyncIterable} iterable - Iterable to convert to stream
+   * @returns {Web.ReadableStream} New ReadableStream
+   */
+  static from(iterable) {
+    return new Web.ReadableStream({
+      start(controller) {
         try {
-            if (underlyingSource?.start) {
-                underlyingSource.start(controller);
+          // Check if it has Symbol.iterator
+          if (iterable?.[Symbol.iterator]) {
+            for (const chunk of iterable) {
+              controller.enqueue(chunk);
             }
+          } else if (isArray(iterable)) {
+            // Handle plain arrays
+            for (const chunk of iterable) {
+              controller.enqueue(chunk);
+            }
+          } else {
+            throw new TypeError('ReadableStream.from requires an iterable');
+          }
+          controller.close();
         } catch (err) {
-            // Only call error() for errors that aren't about enqueue after close
-            if (err.message !== 'Cannot enqueue after close') {
-                controller.error(err);
-            } else {
-                throw err;
-            }
+          controller.error(err);
         }
-    }
-
-    /**
-     * Gets whether the stream is locked to a reader
-     * @returns {boolean}
-     */
-    get locked() {
-        return this[$streamLocked];
-    }
-
-    /**
-     * Gets a reader for the stream
-     * @param {Object} options - Optional reader options (mode not supported in sham)
-     * @returns {ReadableStreamDefaultReader}
-     */
-    getReader(options = {}) {
-        if (this[$streamLocked]) {
-            throw new TypeError('ReadableStream is already locked to a reader');
-        }
-        // this[$streamLocked] = true;
-        // skipping lock intentionally for simplicity
-        const reader = this[$streamReader] ?? new Web.ReadableStreamDefaultReader(this);
-        this[$streamReader] = reader;
-        return reader;
-    }
-
-    /**
-     * Cancels the stream
-     * @param {*} reason - Reason for cancellation
-     * @returns {Promise}
-     */
-    cancel(reason) {
-        if (this[$streamCancelled]) {
-            return;
-        }
-        this[$streamCancelled] = true;
-        this[$streamController].controller.close();
-
-        // Call cancel on underlying source if provided
-        try {
-            if (this[$streamController].cancel) {
-                this[$streamController].cancel(reason);
-            }
-        } catch (err) {
-            return console.warn(err);
-        }
-        return;
-    }
-
-    /**
-     * Internal method to release the reader lock
-     * @private
-     */
-    ['&releaseLock']() {
-        this[$streamLocked] = false;
-        this[$streamReader] = null;
-    }
-
-    /**
-     * Makes ReadableStream iterable with for...of loops
-     * @returns {Iterator} Iterator of stream chunks
-     */
-    *[Symbol.iterator]() {
-        const reader = this.getReader();
-        try {
-            let result;
-            while (false === (result = reader.read()).done) {
-                yield result.value;
-            }
-        } finally {
-            reader.releaseLock();
-        }
-    }
-
-    /**
-     * Creates a ReadableStream from an iterable or async iterable
-     * @param {Iterable|AsyncIterable} iterable - Iterable to convert to stream
-     * @returns {Web.ReadableStream} New ReadableStream
-     */
-    static from(iterable) {
-        return new Web.ReadableStream({
-            start(controller) {
-                try {
-                    // Check if it has Symbol.iterator
-                    if (iterable?.[Symbol.iterator]) {
-                        for (const chunk of iterable) {
-                            controller.enqueue(chunk);
-                        }
-                    } else if (isArray(iterable)) {
-                        // Handle plain arrays
-                        for (const chunk of iterable) {
-                            controller.enqueue(chunk);
-                        }
-                    } else {
-                        throw new TypeError('ReadableStream.from requires an iterable');
-                    }
-                    controller.close();
-                } catch (err) {
-                    controller.error(err);
-                }
-            }
-        });
-    }
-    tee() {
-        const bits = toBits(this);
-        return [
-            Web.ReadableStream.from(bits),
-            Web.ReadableStream.from(bits)
-        ];
-    }
+      }
+    });
+  }
+  tee() {
+    const bits = toBits(this);
+    return [
+      Web.ReadableStream.from(bits),
+      Web.ReadableStream.from(bits)
+    ];
+  }
 };
 
-setProperty(Web, { ReadableStream });
+setProperty(Web, {
+  ReadableStream
+});
 
 /**
  * Web.ReadableStreamDefaultReader - Reader for ReadableStream
@@ -218,99 +224,117 @@ const $readerStream = Symbol('*readerStream');
 const $readerClosed = Symbol('*readerClosed');
 
 const ReadableStreamDefaultReader = class WebReadableStreamDefaultReader {
-    /**
-     * Creates a new reader for a stream
-     * @param {ReadableStream} stream - Stream to read from
-     */
-    constructor(stream) {
-        if (!instanceOf(stream, Web.ReadableStream)) {
-            throw new TypeError('ReadableStreamDefaultReader requires a ReadableStream');
-        }
-        this[$readerStream] = stream;
-        this[$readerClosed] = false;
+  /**
+   * Creates a new reader for a stream
+   * @param {ReadableStream} stream - Stream to read from
+   */
+  constructor(stream) {
+    if (!instanceOf(stream, Web.ReadableStream)) {
+      throw new TypeError('ReadableStreamDefaultReader requires a ReadableStream');
+    }
+    this[$readerStream] = stream;
+    this[$readerClosed] = false;
+  }
+
+  /**
+   * Reads the next chunk from the stream
+   * @returns {Promise<{value: *, done: boolean}>}
+   */
+  read() {
+    const stream = this[$readerStream];
+    const ctrl = stream[$streamController];
+
+    if (this[$readerClosed]) {
+      return {
+        value: undefined,
+        done: true
+      };
     }
 
-    /**
-     * Reads the next chunk from the stream
-     * @returns {Promise<{value: *, done: boolean}>}
-     */
-    read() {
-        const stream = this[$readerStream];
-        const ctrl = stream[$streamController];
-
-        if (this[$readerClosed]) {
-            return { value: undefined, done: true };
-        }
-
-        // If we have queued chunks, return the first one (even if errored, drain queue first)
-        if (ctrl.chunks.length > 0) {
-            const value = ctrl.chunks.shift();
-            return { value, done: false };
-        }
-
-        // Check if stream is errored (after draining queue)
-        if (ctrl.errored) {
-            this[$readerClosed] = true;
-            return ctrl.errored;
-        }
-
-        // If stream is closed and no more chunks, we're done
-        if (ctrl.closed) {
-            this[$readerClosed] = true;
-            return { value: undefined, done: true };
-        }
-
-        // Try to pull more data
-        try {
-            if (ctrl.pull) {
-                ctrl.pull(ctrl.controller);
-            }
-
-            // Check if pull added chunks
-            if (ctrl.chunks.length > 0) {
-                const value = ctrl.chunks.shift();
-                return { value, done: false };
-            }
-
-            // Check if pull closed the stream
-            if (ctrl.closed) {
-                this[$readerClosed] = true;
-                return { value: undefined, done: true };
-            }
-        } catch (err) {
-            ctrl.controller.error(err);
-            return err;
-        }
-
-        // No data available and stream not closed
-        return { value: undefined, done: true };
+    // If we have queued chunks, return the first one (even if errored, drain queue first)
+    if (ctrl.chunks.length > 0) {
+      const value = ctrl.chunks.shift();
+      return {
+        value,
+        done: false
+      };
     }
 
-    /**
-     * Releases the reader's lock on the stream
-     */
-    releaseLock() { }
+    // Check if stream is errored (after draining queue)
+    if (ctrl.errored) {
+      this[$readerClosed] = true;
+      return ctrl.errored;
+    }
 
-    /**
-     * Cancels the stream
-     * @param {*} reason - Reason for cancellation
-     * @returns {Promise}
-     */
-    cancel(reason) {
-        if (this[$readerClosed]) {
-            return;
-        }
-        const stream = this[$readerStream];
+    // If stream is closed and no more chunks, we're done
+    if (ctrl.closed) {
+      this[$readerClosed] = true;
+      return {
+        value: undefined,
+        done: true
+      };
+    }
+
+    // Try to pull more data
+    try {
+      if (ctrl.pull) {
+        ctrl.pull(ctrl.controller);
+      }
+
+      // Check if pull added chunks
+      if (ctrl.chunks.length > 0) {
+        const value = ctrl.chunks.shift();
+        return {
+          value,
+          done: false
+        };
+      }
+
+      // Check if pull closed the stream
+      if (ctrl.closed) {
         this[$readerClosed] = true;
-        if (stream) {
-            return stream.cancel(reason);
-        }
+        return {
+          value: undefined,
+          done: true
+        };
+      }
+    } catch (err) {
+      ctrl.controller.error(err);
+      return err;
     }
-    get closed() {
-        this[$readerClosed];
+
+    // No data available and stream not closed
+    return {
+      value: undefined,
+      done: true
+    };
+  }
+
+  /**
+   * Releases the reader's lock on the stream
+   */
+  releaseLock() {}
+
+  /**
+   * Cancels the stream
+   * @param {*} reason - Reason for cancellation
+   * @returns {Promise}
+   */
+  cancel(reason) {
+    if (this[$readerClosed]) {
+      return;
     }
+    const stream = this[$readerStream];
+    this[$readerClosed] = true;
+    if (stream) {
+      return stream.cancel(reason);
+    }
+  }
+  get closed() {
+    this[$readerClosed];
+  }
 };
 
-setProperty(Web, { ReadableStreamDefaultReader });
-
-
+setProperty(Web, {
+  ReadableStreamDefaultReader
+});

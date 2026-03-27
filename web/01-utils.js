@@ -1,137 +1,136 @@
 const ScripAppService = (() => {
-    let _service;
-    return () => {
-        if (!_service) {
-            _service = ScriptApp.getService();
-        }
-        return _service;
-    };
+  let _service;
+  return () => {
+    if (!_service) {
+      _service = ScriptApp.getService();
+    }
+    return _service;
+  };
 })();
 
-
 /**
-   * HTTP Status Code to Status Text mapping
-   * Comprehensive list of status codes and their text descriptions
-   * 
-   * Priority order for conflicts:
-   * 1. Official HTTP status codes (RFC 7231, etc.)
-   * 2. Unofficial/extension HTTP status codes
-   * 3. Vendor-specific codes (FTP, etc.)
-   * 
-   * When a status code appears in multiple standards, the higher priority
-   * definition is used (e.g., HTTP 500 "Internal Server Error" takes
-   * precedence over FTP 500 "Syntax error, command unrecognized")
-   */
+ * HTTP Status Code to Status Text mapping
+ * Comprehensive list of status codes and their text descriptions
+ * 
+ * Priority order for conflicts:
+ * 1. Official HTTP status codes (RFC 7231, etc.)
+ * 2. Unofficial/extension HTTP status codes
+ * 3. Vendor-specific codes (FTP, etc.)
+ * 
+ * When a status code appears in multiple standards, the higher priority
+ * definition is used (e.g., HTTP 500 "Internal Server Error" takes
+ * precedence over FTP 500 "Syntax error, command unrecognized")
+ */
 const statusCodeMap = {
-    // 1xx Informational
-    100: "Continue",
-    101: "Switching Protocols",
-    102: "Processing",
-    103: "Early Hints",
+  // 1xx Informational
+  100: "Continue",
+  101: "Switching Protocols",
+  102: "Processing",
+  103: "Early Hints",
 
-    // 2xx Success
-    200: "OK",
-    201: "Created",
-    202: "Accepted",
-    203: "Non-Authoritative Information",
-    204: "No Content",
-    205: "Reset Content",
-    206: "Partial Content",
-    207: "Multi-Status",
-    208: "Already Reported",
-    226: "IM Used",
+  // 2xx Success
+  200: "OK",
+  201: "Created",
+  202: "Accepted",
+  203: "Non-Authoritative Information",
+  204: "No Content",
+  205: "Reset Content",
+  206: "Partial Content",
+  207: "Multi-Status",
+  208: "Already Reported",
+  226: "IM Used",
 
-    // 3xx Redirection
-    300: "Multiple Choices",
-    301: "Moved Permanently",
-    302: "Found",
-    303: "See Other",
-    304: "Not Modified",
-    305: "Use Proxy",
-    306: "Switch Proxy",
-    307: "Temporary Redirect",
-    308: "Permanent Redirect",
+  // 3xx Redirection
+  300: "Multiple Choices",
+  301: "Moved Permanently",
+  302: "Found",
+  303: "See Other",
+  304: "Not Modified",
+  305: "Use Proxy",
+  306: "Switch Proxy",
+  307: "Temporary Redirect",
+  308: "Permanent Redirect",
 
-    // 4xx Client Errors
-    400: "Bad Request",
-    401: "Unauthorized",
-    402: "Payment Required",
-    403: "Forbidden",
-    404: "Not Found",
-    405: "Method Not Allowed",
-    406: "Not Acceptable",
-    407: "Proxy Authentication Required",
-    408: "Request Timeout",
-    409: "Conflict",
-    410: "Gone",
-    411: "Length Required",
-    412: "Precondition Failed",
-    413: "Payload Too Large",
-    414: "URI Too Long",
-    415: "Unsupported Media Type",
-    416: "Range Not Satisfiable",
-    417: "Expectation Failed",
-    418: "I'm a teapot",
-    421: "Misdirected Request",
-    422: "Unprocessable Entity",
-    423: "Locked",
-    424: "Failed Dependency",
-    425: "Too Early",
-    426: "Upgrade Required",
-    428: "Precondition Required",
-    429: "Too Many Requests",
-    431: "Request Header Fields Too Large",
-    451: "Unavailable For Legal Reasons",
+  // 4xx Client Errors
+  400: "Bad Request",
+  401: "Unauthorized",
+  402: "Payment Required",
+  403: "Forbidden",
+  404: "Not Found",
+  405: "Method Not Allowed",
+  406: "Not Acceptable",
+  407: "Proxy Authentication Required",
+  408: "Request Timeout",
+  409: "Conflict",
+  410: "Gone",
+  411: "Length Required",
+  412: "Precondition Failed",
+  413: "Payload Too Large",
+  414: "URI Too Long",
+  415: "Unsupported Media Type",
+  416: "Range Not Satisfiable",
+  417: "Expectation Failed",
+  418: "I'm a teapot",
+  421: "Misdirected Request",
+  422: "Unprocessable Entity",
+  423: "Locked",
+  424: "Failed Dependency",
+  425: "Too Early",
+  426: "Upgrade Required",
+  428: "Precondition Required",
+  429: "Too Many Requests",
+  431: "Request Header Fields Too Large",
+  451: "Unavailable For Legal Reasons",
 
-    // 5xx Server Errors
-    500: "Internal Server Error",
-    501: "Not Implemented",
-    502: "Bad Gateway",
-    503: "Service Unavailable",
-    504: "Gateway Timeout",
-    505: "HTTP Version Not Supported",
-    506: "Variant Also Negotiates",
-    507: "Insufficient Storage",
-    508: "Loop Detected",
-    510: "Not Extended",
-    511: "Network Authentication Required",
+  // 5xx Server Errors
+  500: "Internal Server Error",
+  501: "Not Implemented",
+  502: "Bad Gateway",
+  503: "Service Unavailable",
+  504: "Gateway Timeout",
+  505: "HTTP Version Not Supported",
+  506: "Variant Also Negotiates",
+  507: "Insufficient Storage",
+  508: "Loop Detected",
+  510: "Not Extended",
+  511: "Network Authentication Required",
 
-    // FTP Status Codes (non-conflicting with HTTP)
-    110: "Restart marker reply",
-    120: "Service ready in nnn minutes",
-    125: "Data connection already open; transfer starting",
-    150: "File status okay; about to open data connection",
-    211: "System status, or system help reply",
-    212: "Directory status",
-    213: "File status",
-    214: "Help message",
-    215: "NAME system type",
-    220: "Service ready for new user",
-    221: "Service closing control connection",
-    225: "Data connection open; no transfer in progress",
-    227: "Entering Passive Mode",
-    230: "User logged in, proceed",
-    250: "Requested file action okay, completed",
-    257: "PATHNAME created",
-    331: "User name okay, need password",
-    332: "Need account for login",
-    350: "Requested file action pending further information",
-    450: "Requested file action not taken",
-    452: "Requested action not taken, Insufficient storage space in system",
-    530: "Not logged in",
-    532: "Need account for storing files",
-    533: "Command protection level denied for policy reasons",
-    534: "Request denied for policy reasons",
-    535: "Failed security check",
-    536: "Data protection level not supported by security mechanism",
-    537: "Command protection level not supported by security mechanism",
-    550: "Requested action not taken, File unavailable",
-    551: "Requested action aborted, Page type unknown",
-    552: "Requested file action aborted, Exceeded storage allocation",
-    553: "Requested action not taken, File name not allowed",
-    631: "Integrity protected reply",
-    632: "Confidentiality and integrity protected reply",
-    633: "Confidentiality protected reply"
+  // FTP Status Codes (non-conflicting with HTTP)
+  110: "Restart marker reply",
+  120: "Service ready in nnn minutes",
+  125: "Data connection already open; transfer starting",
+  150: "File status okay; about to open data connection",
+  211: "System status, or system help reply",
+  212: "Directory status",
+  213: "File status",
+  214: "Help message",
+  215: "NAME system type",
+  220: "Service ready for new user",
+  221: "Service closing control connection",
+  225: "Data connection open; no transfer in progress",
+  227: "Entering Passive Mode",
+  230: "User logged in, proceed",
+  250: "Requested file action okay, completed",
+  257: "PATHNAME created",
+  331: "User name okay, need password",
+  332: "Need account for login",
+  350: "Requested file action pending further information",
+  450: "Requested file action not taken",
+  452: "Requested action not taken, Insufficient storage space in system",
+  530: "Not logged in",
+  532: "Need account for storing files",
+  533: "Command protection level denied for policy reasons",
+  534: "Request denied for policy reasons",
+  535: "Failed security check",
+  536: "Data protection level not supported by security mechanism",
+  537: "Command protection level not supported by security mechanism",
+  550: "Requested action not taken, File unavailable",
+  551: "Requested action aborted, Page type unknown",
+  552: "Requested file action aborted, Exceeded storage allocation",
+  553: "Requested action not taken, File name not allowed",
+  631: "Integrity protected reply",
+  632: "Confidentiality and integrity protected reply",
+  633: "Confidentiality protected reply"
 };
 
 /**
@@ -141,14 +140,14 @@ const statusCodeMap = {
  * @returns {Object} The property descriptor
  */
 const setProperty = (object, property) => {
-    const [key, value] = Object.entries(property).pop();
-    return Object.defineProperty(object, key, {
-        value,
-        enumerable: true,
-        configurable: false,
-        writeable: false, // for my own sanity
-        writable: false
-    });
+  const [key, value] = Object.entries(property).pop();
+  return Object.defineProperty(object, key, {
+    value,
+    enumerable: true,
+    configurable: false,
+    writeable: false, // for my own sanity
+    writable: false
+  });
 };
 
 /**
@@ -159,13 +158,13 @@ const setProperty = (object, property) => {
  * @param {*} value - Property value
  */
 const setHidden = (obj, prop, value) => {
-    Object.defineProperty(obj, prop, {
-        value,
-        writeable: true,
-        writable: true,
-        enumerable: false,
-        configurable: true
-    });
+  Object.defineProperty(obj, prop, {
+    value,
+    writeable: true,
+    writable: true,
+    enumerable: false,
+    configurable: true
+  });
 };
 
 /**
@@ -181,11 +180,11 @@ const setHidden = (obj, prop, value) => {
  * @returns {boolean} True if x is an instance of y
  */
 const instanceOf = (x, y) => {
-    try {
-        return x instanceof y;
-    } catch (_) {
-        return false;
-    }
+  try {
+    return x instanceof y;
+  } catch (_) {
+    return false;
+  }
 };
 
 // Type checking utility functions
@@ -222,11 +221,11 @@ const isString = x => typeof x === 'string' || instanceOf(x, String) || x?.const
  * @returns {string} String representation
  */
 const Str = x => {
-    try {
-        return String(x);
-    } catch (e) {
-        return String(e);
-    }
+  try {
+    return String(x);
+  } catch (e) {
+    return String(e);
+  }
 };
 
 /**
@@ -242,14 +241,16 @@ const Str = x => {
  * @returns {boolean} True if header is valid
  */
 function isValidHeader(key, value) {
-    try {
-        const headers = {};
-        headers[key] = value;
-        UrlFetchApp.getRequest('https://is.Valid.Header', { headers });
-        return true;
-    } catch (_) {
-        return false;
-    }
+  try {
+    const headers = {};
+    headers[key] = value;
+    UrlFetchApp.getRequest('https://is.Valid.Header', {
+      headers
+    });
+    return true;
+  } catch (_) {
+    return false;
+  }
 }
 
 /**
@@ -272,45 +273,45 @@ function isValidHeader(key, value) {
  * @returns {Array<number>} Byte array
  */
 function toBits(x) {
-    if (isString(x)) {
-        return Utilities.newBlob(x).getBytes();
+  if (isString(x)) {
+    return Utilities.newBlob(x).getBytes();
+  }
+  if (isBuffer(x) || hasBuffer(x)) {
+    return [...new Uint8Array(x.buffer ?? x)];
+  }
+  // Handle FormData by converting to multipart blob first
+  if (instanceOf(x, Web.FormData) || x?.constructor?.name == 'FormData') {
+    return Web.FormData.prototype['&toBlob'].call(x).getBytes();
+  }
+  // Handle ReadableStream by reading all chunks
+  if (instanceOf(x, Web.ReadableStream) || x?.constructor?.name == 'ReadableStream') {
+    const chunks = [];
+    for (const chunk of x) {
+      chunks.push(toBits(chunk));
     }
-    if (isBuffer(x) || hasBuffer(x)) {
-        return [...new Uint8Array(x.buffer ?? x)];
-    }
-    // Handle FormData by converting to multipart blob first
-    if (instanceOf(x, Web.FormData) || x?.constructor?.name == 'FormData') {
-        return Web.FormData.prototype['&toBlob'].call(x).getBytes();
-    }
-    // Handle ReadableStream by reading all chunks
-    if (instanceOf(x, Web.ReadableStream) || x?.constructor?.name == 'ReadableStream') {
-        const chunks = [];
-        for (const chunk of x) {
-            chunks.push(toBits(chunk));
-        }
-        return chunks.flat();
-    }
-    if (hasBits(x)) {
-        return Object.setPrototypeOf(getBits(x), Array.prototype);
-    }
-    if (isBits(x)) {
-        return x;
-    }
-    if (isArray(x)) {
-        return x.map(toBits).flat();
-    }
+    return chunks.flat();
+  }
+  if (hasBits(x)) {
+    return Object.setPrototypeOf(getBits(x), Array.prototype);
+  }
+  if (isBits(x)) {
     return x;
+  }
+  if (isArray(x)) {
+    return x.map(toBits).flat();
+  }
+  return x;
 }
 
 /**
-   * Web.URLSearchParams - URLSearchParams API implementation
-   * 
-   * Provides an interface to work with URL query strings. Supports constructing
-   * from strings, objects, or iterables, and provides methods for manipulating
-   * query parameters.
-   * 
-   * Based on: https://github.com/lifaon74/url-polyfill
-   */
+ * Web.URLSearchParams - URLSearchParams API implementation
+ * 
+ * Provides an interface to work with URL query strings. Supports constructing
+ * from strings, objects, or iterables, and provides methods for manipulating
+ * query parameters.
+ * 
+ * Based on: https://github.com/lifaon74/url-polyfill
+ */
 
 /**
  * Serializes a parameter value for URL encoding
@@ -318,7 +319,7 @@ function toBits(x) {
  * Spaces become '+' instead of '%20'
  */
 const serializeParam = (value) => {
-    return encodeURIComponent(value).replace(/%20/g, '+');
+  return encodeURIComponent(value).replace(/%20/g, '+');
 };
 
 /**
@@ -326,9 +327,8 @@ const serializeParam = (value) => {
  * '+' becomes space, then decodeURIComponent handles the rest
  */
 const deserializeParam = (value) => {
-    return decodeURIComponent(String(value).replace(/\+/g, ' '));
+  return decodeURIComponent(String(value).replace(/\+/g, ' '));
 };
 
 // Helper to check if object is Map-like (has iterator)
 const isMapLike = x => instanceOf(x, Map) || x?.constructor?.name === 'Map' || ['Headers', 'FormData', 'URLSearchParams'].some(y => instanceOf(x, Web[y]) || x?.constructor?.name === y);
-
